@@ -1,0 +1,6 @@
+{
+  "name": "Yatra Saathi",
+  "description": "A Ground-Level Travel Intelligence Platform for Indian Travellers. Travel smarter. Explore deeper. Stay informed.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

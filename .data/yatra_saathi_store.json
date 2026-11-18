@@ -1,0 +1,32 @@
+{
+  "users": [
+    {
+      "id": "usr_61c48a10-8964-4bd8-906c-436c4a50461b",
+      "name": "Test Traveller",
+      "email": "verify_1794914016189@example.com",
+      "passwordHash": "7a678e00c6212d7b8bcb3ceef1546faad241c80fa7e91f7abb1862f7416ad1ae8cdbd3109a6e2df098e5c74cdf1c58208b97fe32a21834e521b8da1104324108",
+      "salt": "9314127c0c47b5af0ab8231a185079f4",
+      "createdAt": "2026-11-17T11:13:36.264Z"
+    }
+  ],
+  "resetTokens": [],
+  "workspaces": {
+    "usr_ae662af7-f535-45af-9f66-a7630fec5253": {
+      "savedItems": [],
+      "savedRoutes": [],
+      "recentlyViewed": [
+        {
+          "destinationId": "udaipur",
+          "destinationName": "Udaipur, Rajasthan",
+          "image": "/src/assets/images/hero_india_udaipur_1794849569685.jpg",
+          "viewedAt": "2026-11-17T05:16:03.169Z"
+        }
+      ]
+    },
+    "usr_61c48a10-8964-4bd8-906c-436c4a50461b": {
+      "savedItems": [],
+      "savedRoutes": [],
+      "recentlyViewed": []
+    }
+  }
+}
