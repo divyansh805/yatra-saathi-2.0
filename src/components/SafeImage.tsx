@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useReducedMotion } from 'motion/react';
+import { usePrefersReducedMotion } from '../motion/useMotion';
 
 interface SafeImageProps {
   src: string;
@@ -8,6 +8,8 @@ interface SafeImageProps {
   aspectClassName?: string;
   priority?: boolean;
   darkSkeleton?: boolean;
+  width?: number;
+  height?: number;
 }
 
 export function SafeImage({
@@ -17,8 +19,10 @@ export function SafeImage({
   aspectClassName = '',
   priority = false,
   darkSkeleton = false,
+  width,
+  height,
 }: SafeImageProps) {
-  const prefersReducedMotion = Boolean(useReducedMotion());
+  const prefersReducedMotion = usePrefersReducedMotion();
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -68,6 +72,8 @@ export function SafeImage({
         ref={imgRef}
         src={src}
         alt={alt}
+        width={width}
+        height={height}
         referrerPolicy="no-referrer"
         loading={priority ? 'eager' : 'lazy'}
         decoding="async"
@@ -76,10 +82,10 @@ export function SafeImage({
         className={`${className} ${
           prefersReducedMotion
             ? loaded
-              ? 'opacity-100'
-              : 'opacity-0'
-            : `transition-[opacity,filter,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                loaded ? 'opacity-100 blur-0' : 'opacity-0 blur-sm'
+              ? 'opacity-100 transition-opacity duration-150'
+              : 'opacity-0 transition-opacity duration-150'
+            : `transition-[opacity,transform] duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                loaded ? 'opacity-100' : 'opacity-0'
               }`
         }`}
       />

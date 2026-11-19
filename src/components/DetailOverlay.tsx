@@ -35,9 +35,44 @@ import {
 import { useApp } from '../contexts/AppContext';
 import { DESTINATIONS, IMAGES } from '../data/destinations';
 import type { DestinationProfile, StayProperty } from '../types/travel';
-import type { CompareResult, RideQuote } from './ProviderBadge';
 import { EASE_PRIMARY } from '../motion/tokens';
 import { setSmoothScrollPaused } from './SmoothScrollManager';
+
+export interface RideQuote {
+  id: string;
+  category: 'bike' | 'auto' | 'cab';
+  categoryLabel: string;
+  provider: 'Rapido' | 'Uber' | 'Ola' | 'Local Prepaid Stand';
+  providerTitle: string;
+  vehicleType: string;
+  maxPassengers: number;
+  luggageCapacity: string;
+  calculatedFareInr: number | null;
+  fareMinInr: number | null;
+  fareMaxInr: number | null;
+  estimatedMinutes: number | null;
+  fareSourceNote: string;
+  fareBreakdown: {
+    baseIncludedKm: number;
+    baseFareInr: number;
+    billableExtraKm: number;
+    perKmRateInr: number;
+    distanceChargeInr: number;
+    bookingFeeInr: number;
+    taxesAndFeesInr: number;
+  } | null;
+  bookingUrl: string | null;
+  bookingLabel: string;
+}
+
+export interface CompareResult {
+  route: {
+    originLabel: string;
+    destLabel: string;
+    distanceKm: number;
+    durationMin: number;
+  };
+}
 
 export interface PlaceOverlayPayload {
   kind: 'place';
@@ -1074,11 +1109,11 @@ function DetailOverlayModal({
                       type="button"
                       onClick={() => {
                         onClose();
-                        navigate('/travel-assist/compare');
+                        navigate('/travel-assist');
                       }}
                       className="inline-flex items-center justify-center gap-2 px-4 py-3 min-h-[46px] rounded-xl bg-white/10 border border-white/25 text-white text-sm font-semibold hover:bg-white/20 transition-colors cursor-pointer"
                     >
-                      <span>Full Comparison Page</span>
+                      <span>Open Smart Local Hop</span>
                       <ArrowRight className="w-4 h-4" aria-hidden="true" />
                     </button>
                   </>
@@ -1091,7 +1126,7 @@ function DetailOverlayModal({
                       onClick={onClose}
                       className="inline-flex items-center justify-center gap-2 px-5 py-3 min-h-[46px] rounded-xl bg-[#E9A34A] text-[#142322] text-sm sm:text-[15px] font-bold hover:bg-[#DF9538] transition-colors"
                     >
-                      <span>Plan Arrival Rides</span>
+                      <span>Open Travel Assist</span>
                       <ArrowRight className="w-4 h-4" aria-hidden="true" />
                     </Link>
                     <Link

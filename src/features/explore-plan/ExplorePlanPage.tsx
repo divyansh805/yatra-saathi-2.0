@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowDown,
+  ArrowRight,
   ArrowUp,
   Bookmark,
   Check,
@@ -28,10 +29,11 @@ import {
 } from '../../components/CinematicDestinationHero';
 import { RevealGroup, RevealItem } from '../../components/Reveal';
 import { MotionCard } from '../../components/MotionCard';
+import { FlipCard } from '../../components/FlipCard';
 import { useDetailOverlay } from '../../components/DetailOverlay';
 import { DESTINATIONS, getDestinationById } from '../../data/destinations';
 import { useApp } from '../../contexts/AppContext';
-import { STAGGER_STEP } from '../../motion/tokens';
+import { STAGGER_LIST_MS } from '../../motion/tokens';
 import type { CafeTag, WeatherSnapshot } from '../../types/travel';
 
 type SectionTab = 'attractions' | 'cafes' | 'adventures' | 'planner';
@@ -67,6 +69,21 @@ const CAFE_TAGS: Array<'All' | CafeTag> = [
   'Group Friendly',
 ];
 
+const BROAD_EXPLORE_CATEGORIES: Array<{
+  label: string;
+  destId: string;
+  tab: SectionTab;
+}> = [
+  { label: 'Temples & Spiritual Journeys', destId: 'katra-jammu', tab: 'attractions' },
+  { label: 'Mountains & Hill Stations', destId: 'manali', tab: 'attractions' },
+  { label: 'Beaches & Coastal Escapes', destId: 'alleppey', tab: 'attractions' },
+  { label: 'Heritage & Royal Palaces', destId: 'udaipur', tab: 'attractions' },
+  { label: 'Nature & Wildlife', destId: 'manali', tab: 'adventures' },
+  { label: 'Adventure & Experiences', destId: 'rishikesh', tab: 'adventures' },
+  { label: 'Lakes & Backwaters', destId: 'alleppey', tab: 'attractions' },
+  { label: 'Cafes & Local Food', destId: 'jaipur', tab: 'cafes' },
+];
+
 export function ExplorePlanPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { openDetail } = useDetailOverlay();
@@ -88,6 +105,7 @@ export function ExplorePlanPage() {
 
   const [activeTab, setActiveTab] = useState<SectionTab>('attractions');
   const [cafeTagFilter, setCafeTagFilter] = useState<'All' | CafeTag>('All');
+  const [flippedExploreKey, setFlippedExploreKey] = useState<string | null>(null);
   const [selectedHeroItem, setSelectedHeroItem] = useState<{
     kind: 'attraction' | 'cafe' | 'adventure';
     id: string;
@@ -118,9 +136,32 @@ export function ExplorePlanPage() {
     status: string;
   } | null>(null);
 
-  // Sync URL param -> selectedDestId
+  const initialCategory = searchParams.get('category') || '';
+  const [selectedCategoryChip, setSelectedCategoryChip] = useState<string>(initialCategory);
+
+  // Sync URL param -> selectedDestId, category & tab
   useEffect(() => {
     const paramDest = searchParams.get('dest');
+    const paramCat = searchParams.get('category');
+    const paramTab = searchParams.get('tab');
+    if (paramCat) {
+      setSelectedCategoryChip(paramCat);
+      const matchedCat = BROAD_EXPLORE_CATEGORIES.find(
+        (c) => c.label.toLowerCase() === paramCat.toLowerCase()
+      );
+      if (matchedCat) {
+        setActiveTab(matchedCat.tab);
+        if (!paramDest) setSelectedDestId(matchedCat.destId);
+      }
+    }
+    if (
+      paramTab === 'attractions' ||
+      paramTab === 'cafes' ||
+      paramTab === 'adventures' ||
+      paramTab === 'planner'
+    ) {
+      setActiveTab(paramTab);
+    }
     if (paramDest && DESTINATIONS.some((d) => d.id === paramDest)) {
       setSelectedDestId(paramDest);
     }
@@ -130,6 +171,7 @@ export function ExplorePlanPage() {
   useEffect(() => {
     const dest = getDestinationById(selectedDestId);
     const hub = dest.arrivalHubs[0];
+    setFlippedExploreKey(null);
     setSelectedHeroItem(null);
     setPickupMode('hub');
     setPickupLabel(hub.name);
@@ -195,8 +237,18 @@ export function ExplorePlanPage() {
   }, [destination, isOnline]);
 
   const handleSelectDestination = (nextId: string) => {
+    setFlippedExploreKey(null);
     setSelectedDestId(nextId);
+    setSelectedCategoryChip('');
     setSearchParams({ dest: nextId });
+  };
+
+  const handleSelectBroadCategory = (cat: (typeof BROAD_EXPLORE_CATEGORIES)[number]) => {
+    setFlippedExploreKey(null);
+    setSelectedCategoryChip(cat.label);
+    setSelectedDestId(cat.destId);
+    setActiveTab(cat.tab);
+    setSearchParams({ dest: cat.destId, category: cat.label });
   };
 
   const filteredCafes = useMemo(() => {
@@ -432,7 +484,7 @@ export function ExplorePlanPage() {
               onClick: () => toggleStop(place.id),
             },
             {
-              label: 'Arrival Rides',
+              label: 'Smart Local Hop',
               to: `/travel-assist?dest=${destination.id}`,
             },
           ],
@@ -539,7 +591,7 @@ export function ExplorePlanPage() {
         },
       },
       secondaryActions: [
-        { label: 'Arrival Rides', to: `/travel-assist?dest=${destination.id}` },
+        { label: 'Smart Local Hop', to: `/travel-assist?dest=${destination.id}` },
         { label: 'Check Stay Reality', to: `/stay-reality?dest=${destination.id}` },
       ],
     };
@@ -575,12 +627,39 @@ export function ExplorePlanPage() {
           medallions={heroMedallions}
           activeMedallionId={activeMedallionId}
           onSelectMedallion={handleSelectExploreMedallion}
+          minHeightClass="min-h-[370px] sm:min-h-[420px]"
           bottomSurface="#F8F6F0"
         />
 
         {/* Connected Destination Brief, Live Weather & Tabs Strip */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 sm:-mt-8 relative z-20">
           <div className="bg-white border border-[#E5DFD3] rounded-2xl p-5 sm:p-7 shadow-xs space-y-5">
+            {/* Broad India Experience Category Switcher */}
+            <div className="space-y-2 pb-4 border-b border-[#E5DFD3]">
+              <p className="eyebrow-mono font-bold text-[#123D3A]">
+                Explore India by Category · {DESTINATIONS.length} Featured Regions
+              </p>
+              <RevealGroup immediate staggerMs={STAGGER_LIST_MS} maxAnimatedItems={12} className="flex flex-wrap gap-2">
+                {BROAD_EXPLORE_CATEGORIES.map((cat, idx) => {
+                  const active = selectedCategoryChip === cat.label;
+                  return (
+                    <RevealItem key={cat.label} index={idx}>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectBroadCategory(cat)}
+                        className={`ys-chip px-3.5 py-2 min-h-[38px] rounded-xl text-xs sm:text-sm font-semibold border cursor-pointer ${
+                          active
+                            ? 'bg-[#123D3A] text-white border-[#123D3A] shadow-2xs'
+                            : 'bg-[#F8F6F0] text-[#142322] border-[#E5DFD3] hover:border-[#123D3A]/45'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    </RevealItem>
+                  );
+                })}
+              </RevealGroup>
+            </div>
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div className="space-y-1 max-w-2xl">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-[#5A6664]">
@@ -603,7 +682,7 @@ export function ExplorePlanPage() {
                   <select
                     value={selectedDestId}
                     onChange={(e) => handleSelectDestination(e.target.value)}
-                    className="px-3.5 py-2.5 min-h-[44px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-semibold text-[#123D3A] focus:outline-none focus:border-[#123D3A] cursor-pointer"
+                    className="ys-input px-3.5 py-2.5 min-h-[44px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-semibold text-[#123D3A] focus:outline-none cursor-pointer"
                   >
                     {DESTINATIONS.map((d) => (
                       <option key={d.id} value={d.id}>
@@ -656,8 +735,11 @@ export function ExplorePlanPage() {
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2.5 min-h-[42px] rounded-lg text-sm font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  onClick={() => {
+                    setFlippedExploreKey(null);
+                    setActiveTab(tab.id);
+                  }}
+                  className={`ys-chip px-4 py-2.5 min-h-[42px] rounded-lg text-sm font-semibold whitespace-nowrap shrink-0 cursor-pointer ${
                     activeTab === tab.id
                       ? 'bg-[#123D3A] text-white'
                       : 'bg-[#F8F6F0] text-[#495553] hover:bg-[#EAE4D7]'
@@ -700,12 +782,20 @@ export function ExplorePlanPage() {
                 </div>
               </div>
 
-              <RevealGroup key={`attr-${destination.id}`} stagger={STAGGER_STEP} immediate className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {destination.attractions.map((place) => {
+              <RevealGroup
+                key={`attr-${destination.id}`}
+                retriggerKey={`attr-${destination.id}`}
+                staggerMs={STAGGER_LIST_MS}
+                maxAnimatedItems={12}
+                immediate
+                className="grid grid-cols-1 md:grid-cols-2 gap-6"
+              >
+                {destination.attractions.map((place, idx) => {
                   const saved = isItemSaved(place.id, 'attraction');
                   const inRoute = selectedStopIds.includes(place.id);
                   const isFeatured =
                     selectedHeroItem?.kind === 'attraction' && selectedHeroItem.id === place.id;
+                  const cardKey = `attr:${place.id}`;
                   const openPlaceModal = () =>
                     openDetail({
                       kind: 'place',
@@ -732,41 +822,122 @@ export function ExplorePlanPage() {
                     });
 
                   return (
-                    <RevealItem key={place.id} className="h-full">
+                    <RevealItem key={place.id} index={idx} className="h-full">
                       <MotionCard
-                        hoverLift={-5}
-                        onClick={openPlaceModal}
                         onMouseEnter={() => preloadHeroImage(place.image)}
-                        className={`group h-full bg-white border rounded-2xl overflow-hidden flex flex-col transition-all duration-300 cursor-pointer ${
+                        className={`group h-full bg-white border rounded-2xl overflow-hidden flex flex-col ${
                           isFeatured
-                            ? 'border-[#123D3A] ring-2 ring-[#E9A34A]/65 shadow-md'
-                            : 'border-[#E5DFD3] hover:border-[#123D3A]/45 hover:shadow-xl'
+                            ? 'border-[#123D3A] ring-2 ring-[#E9A34A]/65'
+                            : 'border-[#E5DFD3] hover:border-[#123D3A]/45'
                         }`}
                       >
-                        <div className="aspect-[4/3] overflow-hidden bg-[#EAE4D7] relative">
-                          <SafeImage
-                            src={place.image}
-                            alt={place.name}
-                            className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.06]"
-                          />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePreviewExploreCard('attraction', place.id, place.image);
-                            }}
-                            className="absolute bottom-3 left-3 px-3 py-1.5 rounded-lg bg-[#0D2B29]/85 hover:bg-[#E9A34A] hover:text-[#142322] text-white text-sm font-semibold backdrop-blur-xs transition-colors cursor-pointer"
-                          >
-                            {isFeatured ? 'Viewing in Hero' : 'Preview in Hero'}
-                          </button>
-                        </div>
+                        <FlipCard
+                          isFlipped={flippedExploreKey === cardKey}
+                          onFlipChange={(next) => setFlippedExploreKey(next ? cardKey : null)}
+                          cardLabel={place.name}
+                          onFrontClick={openPlaceModal}
+                          className="aspect-[4/3] w-full"
+                          roundedClass="rounded-t-2xl"
+                          togglePlacement="top-right"
+                          front={
+                            <div className="w-full h-full relative bg-[#EAE4D7]">
+                              <SafeImage
+                                src={place.image}
+                                alt={place.name}
+                                className="ys-card-img w-full h-full object-cover"
+                              />
+                              <div
+                                className="absolute inset-0 bg-gradient-to-t from-[#0D2B29]/90 via-[#0D2B29]/20 to-transparent pointer-events-none"
+                                aria-hidden="true"
+                              />
+                              <div className="absolute top-3 left-3 pr-14 pointer-events-none">
+                                <span className="inline-block px-2.5 py-1 rounded-full bg-[#0D2B29]/80 text-[#E9A34A] font-mono text-xs uppercase tracking-[0.06em]">
+                                  {place.category}
+                                </span>
+                              </div>
+                              <div className="absolute inset-x-4 bottom-3.5 text-left pointer-events-none">
+                                <p className="text-xs text-[#8CC9E8] font-medium truncate">
+                                  {place.location}
+                                </p>
+                                <p className="font-editorial text-xl font-semibold text-white leading-snug line-clamp-1 mt-0.5">
+                                  {place.name}
+                                </p>
+                              </div>
+                            </div>
+                          }
+                          back={
+                            <div className="flex flex-col justify-between h-full gap-3">
+                              <div className="space-y-1.5 pr-11">
+                                <p className="eyebrow-mono text-[#E9A34A]">{place.category}</p>
+                                <h4 className="font-editorial text-lg font-bold text-white leading-snug line-clamp-2">
+                                  {place.name}
+                                </h4>
+                                <p className="text-xs text-[#F8F6F0]/80 leading-relaxed line-clamp-2">
+                                  {place.shortDescription}
+                                </p>
+                              </div>
+
+                              <dl className="space-y-1.5 text-xs border-y border-white/15 py-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <dt className="text-[#F8F6F0]/70">Best Time</dt>
+                                  <dd className="font-medium text-white truncate max-w-[180px]">
+                                    {place.bestVisitingTime}
+                                  </dd>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <dt className="text-[#F8F6F0]/70">Hours</dt>
+                                  <dd className="font-medium text-white truncate max-w-[180px]">
+                                    {place.openingHours}
+                                  </dd>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <dt className="text-[#F8F6F0]/70">Entry Fee</dt>
+                                  <dd className="font-mono font-semibold text-[#E9A34A] truncate max-w-[180px]">
+                                    {place.entryFeeVerified ? place.entryFee : 'Verify at counter'}
+                                  </dd>
+                                </div>
+                              </dl>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openPlaceModal();
+                                }}
+                                className="ys-btn-primary w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[40px] rounded-xl bg-[#E9A34A] hover:bg-[#DF9538] text-[#142322] text-sm font-bold cursor-pointer"
+                              >
+                                <span>View details</span>
+                                <ArrowRight className="ys-arrow w-4 h-4" aria-hidden="true" />
+                              </button>
+                            </div>
+                          }
+                        />
+
                         <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
                           <div>
-                            <p className="text-sm text-[#5A6664]">
-                              {place.category} <span aria-hidden="true">·</span> {place.location}
-                            </p>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm text-[#5A6664] truncate">
+                                {place.category} <span aria-hidden="true">·</span> {place.location}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePreviewExploreCard('attraction', place.id, place.image);
+                                }}
+                                className="ys-chip shrink-0 px-2.5 py-1 rounded-md bg-[#F8F6F0] border border-[#E5DFD3] hover:border-[#123D3A] text-xs font-semibold text-[#123D3A] cursor-pointer"
+                              >
+                                {isFeatured ? 'Viewing in Hero' : 'Preview in Hero'}
+                              </button>
+                            </div>
                             <h3 className="font-editorial text-2xl font-semibold text-[#123D3A] mt-1 group-hover:text-[#E9A34A] transition-colors">
-                              {place.name}
+                              <button
+                                type="button"
+                                onClick={openPlaceModal}
+                                className="text-left cursor-pointer hover:underline"
+                              >
+                                {place.name}
+                              </button>
                             </h3>
                             <p className="text-[15px] text-[#495553] mt-2 leading-relaxed">
                               {place.shortDescription}
@@ -781,7 +952,7 @@ export function ExplorePlanPage() {
                                   e.stopPropagation();
                                   toggleStop(place.id);
                                 }}
-                                className={`inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
+                                className={`ys-chip inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-lg text-sm font-semibold cursor-pointer ${
                                   inRoute
                                     ? 'bg-[#123D3A] text-white'
                                     : 'border border-[#D7CFC1] text-[#123D3A] hover:bg-[#F8F6F0]'
@@ -805,7 +976,7 @@ export function ExplorePlanPage() {
                                   );
                                 }}
                                 aria-label={saved ? `Unsave ${place.name}` : `Save ${place.name}`}
-                                className={`p-2.5 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg border transition-colors cursor-pointer ${
+                                className={`ys-chip p-2.5 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg border cursor-pointer ${
                                   saved
                                     ? 'border-[#E9A34A] bg-[#E9A34A]/15 text-[#123D3A]'
                                     : 'border-[#D7CFC1] text-[#5A6664] hover:text-[#123D3A]'
@@ -818,7 +989,7 @@ export function ExplorePlanPage() {
                             <Link
                               to={`/explore/attraction/${place.id}?dest=${destination.id}`}
                               onClick={(e) => e.stopPropagation()}
-                              className="text-sm font-semibold text-[#123D3A] hover:text-[#E9A34A]"
+                              className="ys-nav-link text-sm font-semibold text-[#123D3A] hover:text-[#E9A34A]"
                             >
                               Full details
                             </Link>
@@ -851,8 +1022,11 @@ export function ExplorePlanPage() {
                     <button
                       key={tag}
                       type="button"
-                      onClick={() => setCafeTagFilter(tag)}
-                      className={`px-3.5 py-2 min-h-[40px] rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
+                      onClick={() => {
+                        setFlippedExploreKey(null);
+                        setCafeTagFilter(tag);
+                      }}
+                      className={`ys-chip px-3.5 py-2 min-h-[40px] rounded-lg text-sm font-semibold cursor-pointer ${
                         cafeTagFilter === tag
                           ? 'bg-[#E9A34A] text-[#142322]'
                           : 'bg-white/10 text-white hover:bg-white/20'
@@ -878,11 +1052,19 @@ export function ExplorePlanPage() {
                   </button>
                 </div>
               ) : (
-                <RevealGroup key={`cafes-${destination.id}-${cafeTagFilter}`} stagger={STAGGER_STEP} immediate className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {filteredCafes.map((cafe) => {
+                <RevealGroup
+                  key={`cafes-${destination.id}-${cafeTagFilter}`}
+                  retriggerKey={`cafes-${destination.id}-${cafeTagFilter}`}
+                  staggerMs={STAGGER_LIST_MS}
+                  maxAnimatedItems={12}
+                  immediate
+                  className="grid grid-cols-1 md:grid-cols-2 gap-8"
+                >
+                  {filteredCafes.map((cafe, idx) => {
                     const saved = isItemSaved(cafe.id, 'cafe');
                     const isFeatured =
                       selectedHeroItem?.kind === 'cafe' && selectedHeroItem.id === cafe.id;
+                    const cardKey = `cafe:${cafe.id}`;
                     const openCafeModal = () =>
                       openDetail({
                         kind: 'place',
@@ -908,41 +1090,125 @@ export function ExplorePlanPage() {
                       });
 
                     return (
-                      <RevealItem key={cafe.id} className="h-full">
+                      <RevealItem key={cafe.id} index={idx} className="h-full">
                         <MotionCard
-                          hoverLift={-5}
-                          onClick={openCafeModal}
                           onMouseEnter={() => preloadHeroImage(cafe.image)}
-                          className={`group h-full bg-white border rounded-2xl overflow-hidden flex flex-col transition-all duration-300 cursor-pointer ${
+                          className={`group h-full bg-white border rounded-2xl overflow-hidden flex flex-col ${
                             isFeatured
-                              ? 'border-[#123D3A] ring-2 ring-[#E9A34A]/65 shadow-md'
-                              : 'border-[#E5DFD3] hover:border-[#123D3A]/45 hover:shadow-xl'
+                              ? 'border-[#123D3A] ring-2 ring-[#E9A34A]/65'
+                              : 'border-[#E5DFD3] hover:border-[#123D3A]/45'
                           }`}
                         >
-                          <div className="aspect-[4/3] overflow-hidden relative bg-[#EAE4D7]">
-                            <SafeImage
-                              src={cafe.image}
-                              alt={`${cafe.name} — ${cafe.setting}`}
-                              className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.06]"
-                            />
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePreviewExploreCard('cafe', cafe.id, cafe.image);
-                              }}
-                              className="absolute bottom-3 left-3 px-3 py-1.5 rounded-lg bg-[#0D2B29]/85 hover:bg-[#E9A34A] hover:text-[#142322] text-white text-sm font-semibold backdrop-blur-xs transition-colors cursor-pointer"
-                            >
-                              {isFeatured ? 'Viewing in Hero' : 'Preview in Hero'}
-                            </button>
-                          </div>
+                          <FlipCard
+                            isFlipped={flippedExploreKey === cardKey}
+                            onFlipChange={(next) => setFlippedExploreKey(next ? cardKey : null)}
+                            cardLabel={cafe.name}
+                            onFrontClick={openCafeModal}
+                            className="aspect-[4/3] w-full"
+                            roundedClass="rounded-t-2xl"
+                            togglePlacement="top-right"
+                            front={
+                              <div className="w-full h-full relative bg-[#EAE4D7]">
+                                <SafeImage
+                                  src={cafe.image}
+                                  alt={`${cafe.name} — ${cafe.setting}`}
+                                  className="ys-card-img w-full h-full object-cover"
+                                />
+                                <div
+                                  className="absolute inset-0 bg-gradient-to-t from-[#0D2B29]/90 via-[#0D2B29]/20 to-transparent pointer-events-none"
+                                  aria-hidden="true"
+                                />
+                                <div className="absolute top-3 left-3 pr-14 pointer-events-none">
+                                  <span className="inline-block px-2.5 py-1 rounded-full bg-[#0D2B29]/80 text-[#E9A34A] font-mono text-xs uppercase tracking-[0.06em]">
+                                    {cafe.setting}
+                                  </span>
+                                </div>
+                                <div className="absolute inset-x-4 bottom-3.5 text-left pointer-events-none">
+                                  <p className="text-xs text-[#8CC9E8] font-medium truncate">
+                                    {cafe.location}
+                                  </p>
+                                  <p className="font-editorial text-xl font-semibold text-white leading-snug line-clamp-1 mt-0.5">
+                                    {cafe.name}
+                                  </p>
+                                </div>
+                              </div>
+                            }
+                            back={
+                              <div className="flex flex-col justify-between h-full gap-3">
+                                <div className="space-y-1.5 pr-11">
+                                  <p className="eyebrow-mono text-[#E9A34A]">Cafe Corner · {cafe.setting}</p>
+                                  <h4 className="font-editorial text-lg font-bold text-white leading-snug line-clamp-2">
+                                    {cafe.name}
+                                  </h4>
+                                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                    {cafe.tags.slice(0, 3).map((tag) => (
+                                      <span
+                                        key={tag}
+                                        className="px-2 py-0.5 rounded-full bg-white/12 border border-white/18 text-[11px] font-medium text-[#8CC9E8]"
+                                      >
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <dl className="space-y-1.5 text-xs border-y border-white/15 py-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <dt className="text-[#F8F6F0]/70">Price</dt>
+                                    <dd className="font-mono font-semibold text-[#E9A34A] truncate max-w-[180px]">
+                                      {cafe.priceRange || 'Check menu locally'}
+                                    </dd>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <dt className="text-[#F8F6F0]/70">Hours</dt>
+                                    <dd className="font-medium text-white truncate max-w-[180px]">
+                                      {cafe.hoursVerified && cafe.openingHours
+                                        ? cafe.openingHours
+                                        : 'Hours unverified'}
+                                    </dd>
+                                  </div>
+                                </dl>
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openCafeModal();
+                                  }}
+                                  className="ys-btn-primary w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[40px] rounded-xl bg-[#E9A34A] hover:bg-[#DF9538] text-[#142322] text-sm font-bold cursor-pointer"
+                                >
+                                  <span>View details</span>
+                                  <ArrowRight className="ys-arrow w-4 h-4" aria-hidden="true" />
+                                </button>
+                              </div>
+                            }
+                          />
+
                           <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
                             <div className="space-y-2">
-                              <p className="text-sm text-[#5A6664]">
-                                {cafe.setting} <span aria-hidden="true">·</span> {cafe.location}
-                              </p>
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm text-[#5A6664] truncate">
+                                  {cafe.setting} <span aria-hidden="true">·</span> {cafe.location}
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePreviewExploreCard('cafe', cafe.id, cafe.image);
+                                  }}
+                                  className="ys-chip shrink-0 px-2.5 py-1 rounded-md bg-[#F8F6F0] border border-[#E5DFD3] hover:border-[#123D3A] text-xs font-semibold text-[#123D3A] cursor-pointer"
+                                >
+                                  {isFeatured ? 'Viewing in Hero' : 'Preview in Hero'}
+                                </button>
+                              </div>
                               <h3 className="font-editorial text-2xl font-semibold text-[#123D3A] group-hover:text-[#E9A34A] transition-colors">
-                                {cafe.name}
+                                <button
+                                  type="button"
+                                  onClick={openCafeModal}
+                                  className="text-left cursor-pointer hover:underline"
+                                >
+                                  {cafe.name}
+                                </button>
                               </h3>
                               <p className="text-[15px] text-[#495553] leading-relaxed">
                                 {cafe.shortDescription}
@@ -971,7 +1237,7 @@ export function ExplorePlanPage() {
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={(e) => e.stopPropagation()}
-                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-lg bg-[#123D3A] text-white text-sm font-semibold hover:bg-[#194E4A] transition-colors"
+                                    className="ys-chip inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-lg bg-[#123D3A] text-white text-sm font-semibold hover:bg-[#194E4A]"
                                   >
                                     Directions
                                     <ExternalLink className="w-4 h-4" aria-hidden="true" />
@@ -990,7 +1256,7 @@ export function ExplorePlanPage() {
                                       );
                                     }}
                                     aria-label={saved ? `Unsave ${cafe.name}` : `Save ${cafe.name}`}
-                                    className={`p-2.5 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg border transition-colors cursor-pointer ${
+                                    className={`ys-chip p-2.5 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg border cursor-pointer ${
                                       saved
                                         ? 'border-[#E9A34A] bg-[#E9A34A]/15 text-[#123D3A]'
                                         : 'border-[#D7CFC1] text-[#5A6664] hover:text-[#123D3A]'
@@ -1002,7 +1268,7 @@ export function ExplorePlanPage() {
                                 <Link
                                   to={`/explore/cafe/${cafe.id}?dest=${destination.id}`}
                                   onClick={(e) => e.stopPropagation()}
-                                  className="text-sm font-semibold text-[#123D3A] hover:text-[#E9A34A]"
+                                  className="ys-nav-link text-sm font-semibold text-[#123D3A] hover:text-[#E9A34A]"
                                 >
                                   Read solo guide
                                 </Link>
@@ -1030,11 +1296,19 @@ export function ExplorePlanPage() {
                 </p>
               </div>
 
-              <RevealGroup key={`adv-${destination.id}`} stagger={STAGGER_STEP} immediate className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {destination.adventures.map((adv) => {
+              <RevealGroup
+                key={`adv-${destination.id}`}
+                retriggerKey={`adv-${destination.id}`}
+                staggerMs={STAGGER_LIST_MS}
+                maxAnimatedItems={12}
+                immediate
+                className="grid grid-cols-1 md:grid-cols-2 gap-6"
+              >
+                {destination.adventures.map((adv, idx) => {
                   const saved = isItemSaved(adv.id, 'adventure');
                   const isFeatured =
                     selectedHeroItem?.kind === 'adventure' && selectedHeroItem.id === adv.id;
+                  const cardKey = `adv:${adv.id}`;
                   const openAdvModal = () =>
                     openDetail({
                       kind: 'place',
@@ -1060,42 +1334,123 @@ export function ExplorePlanPage() {
                     });
 
                   return (
-                    <RevealItem key={adv.id} className="h-full">
+                    <RevealItem key={adv.id} index={idx} className="h-full">
                       <MotionCard
-                        hoverLift={-5}
-                        onClick={openAdvModal}
                         onMouseEnter={() => preloadHeroImage(adv.image)}
-                        className={`group h-full bg-white border rounded-2xl overflow-hidden flex flex-col transition-all duration-300 cursor-pointer ${
+                        className={`group h-full bg-white border rounded-2xl overflow-hidden flex flex-col ${
                           isFeatured
-                            ? 'border-[#123D3A] ring-2 ring-[#E9A34A]/65 shadow-md'
-                            : 'border-[#E5DFD3] hover:border-[#123D3A]/45 hover:shadow-xl'
+                            ? 'border-[#123D3A] ring-2 ring-[#E9A34A]/65'
+                            : 'border-[#E5DFD3] hover:border-[#123D3A]/45'
                         }`}
                       >
-                        <div className="aspect-[4/3] overflow-hidden bg-[#EAE4D7] relative">
-                          <SafeImage
-                            src={adv.image}
-                            alt={adv.name}
-                            className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.06]"
-                          />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePreviewExploreCard('adventure', adv.id, adv.image);
-                            }}
-                            className="absolute bottom-3 left-3 px-3 py-1.5 rounded-lg bg-[#0D2B29]/85 hover:bg-[#E9A34A] hover:text-[#142322] text-white text-sm font-semibold backdrop-blur-xs transition-colors cursor-pointer"
-                          >
-                            {isFeatured ? 'Viewing in Hero' : 'Preview in Hero'}
-                          </button>
-                        </div>
+                        <FlipCard
+                          isFlipped={flippedExploreKey === cardKey}
+                          onFlipChange={(next) => setFlippedExploreKey(next ? cardKey : null)}
+                          cardLabel={adv.name}
+                          onFrontClick={openAdvModal}
+                          className="aspect-[4/3] w-full"
+                          roundedClass="rounded-t-2xl"
+                          togglePlacement="top-right"
+                          front={
+                            <div className="w-full h-full relative bg-[#EAE4D7]">
+                              <SafeImage
+                                src={adv.image}
+                                alt={adv.name}
+                                className="ys-card-img w-full h-full object-cover"
+                              />
+                              <div
+                                className="absolute inset-0 bg-gradient-to-t from-[#0D2B29]/90 via-[#0D2B29]/20 to-transparent pointer-events-none"
+                                aria-hidden="true"
+                              />
+                              <div className="absolute top-3 left-3 pr-14 pointer-events-none">
+                                <span className="inline-block px-2.5 py-1 rounded-full bg-[#0D2B29]/80 text-[#E9A34A] font-mono text-xs uppercase tracking-[0.06em]">
+                                  {adv.activityType}
+                                </span>
+                              </div>
+                              <div className="absolute inset-x-4 bottom-3.5 text-left pointer-events-none">
+                                <p className="text-xs text-[#8CC9E8] font-medium truncate">
+                                  {adv.duration} · {adv.seasonWindow}
+                                </p>
+                                <p className="font-editorial text-xl font-semibold text-white leading-snug line-clamp-1 mt-0.5">
+                                  {adv.name}
+                                </p>
+                              </div>
+                            </div>
+                          }
+                          back={
+                            <div className="flex flex-col justify-between h-full gap-3">
+                              <div className="space-y-1.5 pr-11">
+                                <p className="eyebrow-mono text-[#E9A34A]">{adv.activityType}</p>
+                                <h4 className="font-editorial text-lg font-bold text-white leading-snug line-clamp-2">
+                                  {adv.name}
+                                </h4>
+                                <p className="text-xs text-[#F8F6F0]/80 leading-relaxed line-clamp-2">
+                                  {adv.safetyRequirements}
+                                </p>
+                              </div>
+
+                              <dl className="space-y-1.5 text-xs border-y border-white/15 py-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <dt className="text-[#F8F6F0]/70">Window</dt>
+                                  <dd className="font-medium text-white truncate max-w-[180px]">
+                                    {adv.duration} · {adv.seasonWindow}
+                                  </dd>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <dt className="text-[#F8F6F0]/70">Tariff</dt>
+                                  <dd className="font-mono font-semibold text-[#E9A34A] truncate max-w-[180px]">
+                                    {adv.approxCost || 'Check operator'}
+                                  </dd>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <dt className="text-[#F8F6F0]/70">Age Limit</dt>
+                                  <dd className="font-medium text-white truncate max-w-[180px]">
+                                    {adv.ageRequirement}
+                                  </dd>
+                                </div>
+                              </dl>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openAdvModal();
+                                }}
+                                className="ys-btn-primary w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[40px] rounded-xl bg-[#E9A34A] hover:bg-[#DF9538] text-[#142322] text-sm font-bold cursor-pointer"
+                              >
+                                <span>View details</span>
+                                <ArrowRight className="ys-arrow w-4 h-4" aria-hidden="true" />
+                              </button>
+                            </div>
+                          }
+                        />
+
                         <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
                           <div className="space-y-2">
-                            <p className="text-sm text-[#5A6664]">
-                              {adv.activityType} <span aria-hidden="true">·</span> {adv.duration}{' '}
-                              <span aria-hidden="true">·</span> {adv.seasonWindow}
-                            </p>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm text-[#5A6664] truncate">
+                                {adv.activityType} <span aria-hidden="true">·</span> {adv.duration}{' '}
+                                <span aria-hidden="true">·</span> {adv.seasonWindow}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePreviewExploreCard('adventure', adv.id, adv.image);
+                                }}
+                                className="ys-chip shrink-0 px-2.5 py-1 rounded-md bg-[#F8F6F0] border border-[#E5DFD3] hover:border-[#123D3A] text-xs font-semibold text-[#123D3A] cursor-pointer"
+                              >
+                                {isFeatured ? 'Viewing in Hero' : 'Preview in Hero'}
+                              </button>
+                            </div>
                             <h3 className="font-editorial text-2xl font-semibold text-[#123D3A] group-hover:text-[#E9A34A] transition-colors">
-                              {adv.name}
+                              <button
+                                type="button"
+                                onClick={openAdvModal}
+                                className="text-left cursor-pointer hover:underline"
+                              >
+                                {adv.name}
+                              </button>
                             </h3>
                             <p className="text-[15px] text-[#495553] leading-relaxed">
                               {adv.shortDescription}
@@ -1127,7 +1482,7 @@ export function ExplorePlanPage() {
                                   );
                                 }}
                                 aria-label={saved ? `Unsave ${adv.name}` : `Save ${adv.name}`}
-                                className={`p-2.5 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg border transition-colors cursor-pointer ${
+                                className={`ys-chip p-2.5 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg border cursor-pointer ${
                                   saved
                                     ? 'border-[#E9A34A] bg-[#E9A34A]/15 text-[#123D3A]'
                                     : 'border-[#D7CFC1] text-[#5A6664] hover:text-[#123D3A]'
@@ -1138,7 +1493,7 @@ export function ExplorePlanPage() {
                               <Link
                                 to={`/explore/adventure/${adv.id}?dest=${destination.id}`}
                                 onClick={(e) => e.stopPropagation()}
-                                className="px-4 py-2.5 min-h-[40px] inline-flex items-center rounded-lg bg-[#123D3A] text-white text-sm font-semibold hover:bg-[#194E4A] transition-colors"
+                                className="ys-btn-primary px-4 py-2.5 min-h-[40px] inline-flex items-center rounded-lg bg-[#123D3A] text-white text-sm font-semibold hover:bg-[#194E4A]"
                               >
                                 Activity details
                               </Link>
@@ -1219,7 +1574,7 @@ export function ExplorePlanPage() {
                     value={pickupLabel}
                     onChange={(e) => setPickupLabel(e.target.value)}
                     aria-label="Pickup point label"
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm"
+                    className="ys-input w-full px-3.5 py-2.5 rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm focus:outline-none"
                   />
                 </div>
 
@@ -1233,7 +1588,7 @@ export function ExplorePlanPage() {
                       type="button"
                       onClick={() => computeSightseeingPlan(true)}
                       disabled={planLoading || orderedSelectedAttractions.length === 0}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-semibold text-[#123D3A] hover:bg-[#EAE4D7] disabled:opacity-50 cursor-pointer"
+                      className="ys-btn-secondary inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-semibold text-[#123D3A] disabled:opacity-50 cursor-pointer"
                     >
                       <Sparkles className="w-4 h-4 text-[#E9A34A]" aria-hidden="true" />
                       Suggest Geographic Order
@@ -1249,7 +1604,7 @@ export function ExplorePlanPage() {
                           key={attr.id}
                           type="button"
                           onClick={() => toggleStop(attr.id)}
-                          className={`px-3.5 py-2 rounded-lg text-sm font-medium border transition-colors cursor-pointer ${
+                          className={`ys-chip px-3.5 py-2 rounded-lg text-sm font-medium border cursor-pointer ${
                             active
                               ? 'border-[#123D3A] bg-[#123D3A]/5 text-[#123D3A]'
                               : 'border-[#E5DFD3] text-[#5A6664]'
@@ -1320,16 +1675,16 @@ export function ExplorePlanPage() {
                       type="button"
                       onClick={() => computeSightseeingPlan(false)}
                       disabled={planLoading || orderedSelectedAttractions.length === 0}
-                      className="px-5 py-2.5 min-h-[44px] rounded-lg bg-[#E9A34A] text-[#142322] text-sm font-semibold hover:bg-[#df9538] disabled:opacity-50 inline-flex items-center gap-2 cursor-pointer"
+                      className="ys-btn-primary px-5 py-2.5 min-h-[44px] rounded-lg bg-[#E9A34A] text-[#142322] text-sm font-semibold hover:bg-[#df9538] disabled:opacity-50 inline-flex items-center gap-2 cursor-pointer"
                     >
                       {planLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                      Calculate Budget &amp; Route
+                      <span>Calculate Budget &amp; Route</span>
                     </button>
                     <button
                       type="button"
                       onClick={handleSaveRoute}
                       disabled={orderedSelectedAttractions.length === 0}
-                      className="px-4 py-2.5 min-h-[44px] rounded-lg border border-[#123D3A] text-[#123D3A] text-sm font-semibold hover:bg-[#123D3A]/5 disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+                      className="ys-btn-secondary px-4 py-2.5 min-h-[44px] rounded-lg border border-[#123D3A] text-[#123D3A] text-sm font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
                     >
                       <Route className="w-4 h-4" />
                       Save Route Offline
@@ -1370,22 +1725,30 @@ export function ExplorePlanPage() {
                       </div>
                     </div>
 
-                    <div className="divide-y divide-[#E5DFD3] text-sm">
-                      {planResult.legs.map((leg) => (
-                        <div key={leg.stopId} className="py-3 flex items-center justify-between gap-4">
-                          <div className="min-w-0">
-                            <p className="font-semibold text-[#123D3A] truncate">{leg.attractionName}</p>
-                            <p className="text-sm text-[#5A6664] truncate">
-                              From {leg.fromLabel} · {leg.distanceKm} km · ~{leg.durationMin} mins
-                            </p>
+                    <RevealGroup
+                      immediate
+                      retriggerKey={planResult.lastUpdated}
+                      staggerMs={STAGGER_LIST_MS}
+                      maxAnimatedItems={12}
+                      className="divide-y divide-[#E5DFD3] text-sm"
+                    >
+                      {planResult.legs.map((leg, idx) => (
+                        <RevealItem key={leg.stopId} index={idx}>
+                          <div className="py-3 flex items-center justify-between gap-4">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-[#123D3A] truncate">{leg.attractionName}</p>
+                              <p className="text-sm text-[#5A6664] truncate">
+                                From {leg.fromLabel} · {leg.distanceKm} km · ~{leg.durationMin} mins
+                              </p>
+                            </div>
+                            <div className="text-right font-mono text-sm tabular-figures shrink-0">
+                              <p className="font-semibold text-[#123D3A]">Auto ~₹{leg.autoEstimateInr}</p>
+                              <p className="text-[#5A6664]">Cab ~₹{leg.cabEstimateInr}</p>
+                            </div>
                           </div>
-                          <div className="text-right font-mono text-sm tabular-figures shrink-0">
-                            <p className="font-semibold text-[#123D3A]">Auto ~₹{leg.autoEstimateInr}</p>
-                            <p className="text-[#5A6664]">Cab ~₹{leg.cabEstimateInr}</p>
-                          </div>
-                        </div>
+                        </RevealItem>
                       ))}
-                    </div>
+                    </RevealGroup>
                   </div>
                 )}
               </div>

@@ -37,7 +37,7 @@ const DICTIONARY: Record<LanguageCode, TranslationStrings> = {
     navLogout: 'Log Out',
     heroHeadline: 'Travel beyond the ordinary.',
     heroSupport:
-      'Discover destinations, compare your journeys and experience every place with confidence.',
+      'Discover destinations, plan smart local journeys and experience every place with confidence.',
     heroCtaPrimary: 'Get Started',
     heroCtaSecondary: 'Discover How It Works',
     dashboardHeadline: 'Where would you like to go next?',
@@ -56,7 +56,7 @@ const DICTIONARY: Record<LanguageCode, TranslationStrings> = {
     navLogout: 'लॉग आउट',
     heroHeadline: 'साधारण से परे यात्रा करें।',
     heroSupport:
-      'गंतव्यों को जानें, अपने पहले सफर की तुलना करें और हर स्थान को पूरे भरोसे के साथ अनुभव करें।',
+      'गंतव्यों को जानें, स्थानीय सफर की सही योजना बनाएं और हर स्थान को पूरे भरोसे के साथ अनुभव करें।',
     heroCtaPrimary: 'शुरू करें',
     heroCtaSecondary: 'जानें यह कैसे काम करता है',
     dashboardHeadline: 'आप आगे कहाँ जाना चाहेंगे?',
@@ -75,7 +75,7 @@ const DICTIONARY: Record<LanguageCode, TranslationStrings> = {
     navLogout: 'வெளியேறு',
     heroHeadline: 'சாதாரணத்திற்கு அப்பால் பயணியுங்கள்.',
     heroSupport:
-      'இடங்களைக் கண்டறிந்து, பயணங்களை ஒப்பிட்டு, நம்பிக்கையுடன் ஒவ்வொரு ஊரையும் அனுபவியுங்கள்.',
+      'இடங்களைக் கண்டறிந்து, உள்ளூர் பயணத்தை திட்டமிட்டு, நம்பிக்கையுடன் ஒவ்வொரு ஊரையும் அனுபவியுங்கள்.',
     heroCtaPrimary: 'தொடங்குங்கள்',
     heroCtaSecondary: 'எப்படி செயல்படுகிறது',
     dashboardHeadline: 'அடுத்து எங்கே செல்ல விரும்புகிறீர்கள்?',
@@ -94,7 +94,7 @@ const DICTIONARY: Record<LanguageCode, TranslationStrings> = {
     navLogout: 'लॉग आउट',
     heroHeadline: 'सामान्य पलीकडचा प्रवास करा.',
     heroSupport:
-      'नवीन ठिकाणे शोधा, प्रवासाची तुलना करा आणि प्रत्येक ठिकाणाचा आत्मविश्वासाने अनुभव घ्या.',
+      'नवीन ठिकाणे शोधा, स्थानिक प्रवासाचे नियोजन करा आणि प्रत्येक ठिकाणाचा आत्मविश्वासाने अनुभव घ्या.',
     heroCtaPrimary: 'सुरू करा',
     heroCtaSecondary: 'हे कसे कार्य करते ते पहा',
     dashboardHeadline: 'पुढे कुठे जायला आवडेल?',

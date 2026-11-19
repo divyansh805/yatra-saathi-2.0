@@ -12,10 +12,11 @@ import {
 } from '../../components/CinematicDestinationHero';
 import { RevealGroup, RevealItem } from '../../components/Reveal';
 import { MotionCard } from '../../components/MotionCard';
+import { FlipCard } from '../../components/FlipCard';
 import { useDetailOverlay } from '../../components/DetailOverlay';
 import { DESTINATIONS, IMAGES } from '../../data/destinations';
 import { useApp } from '../../contexts/AppContext';
-import { STAGGER_STEP } from '../../motion/tokens';
+import { STAGGER_LIST_MS } from '../../motion/tokens';
 
 export function StayRealityPage() {
   const [searchParams] = useSearchParams();
@@ -34,6 +35,7 @@ export function StayRealityPage() {
   const [locationPref, setLocationPref] = useState('');
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [selectedHeroStayId, setSelectedHeroStayId] = useState<string | null>(null);
+  const [flippedStayId, setFlippedStayId] = useState<string | null>(null);
   const heroSectionRef = useRef<HTMLElement | null>(null);
   const filterSectionRef = useRef<HTMLElement | null>(null);
 
@@ -185,6 +187,7 @@ export function StayRealityPage() {
           medallions={stayHeroMedallions}
           activeMedallionId={selectedHeroStayId}
           onSelectMedallion={(id) => setSelectedHeroStayId(id)}
+          minHeightClass="min-h-[370px] sm:min-h-[420px]"
           bottomSurface="#F8F6F0"
         />
 
@@ -200,7 +203,7 @@ export function StayRealityPage() {
                   id="sr-dest"
                   value={destFilter}
                   onChange={(e) => setDestFilter(e.target.value)}
-                  className="w-full px-3.5 py-2.5 min-h-[44px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-medium focus:outline-none focus:border-[#123D3A]"
+                  className="ys-input w-full px-3.5 py-2.5 min-h-[44px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-medium focus:outline-none"
                 >
                   <option value="all">All Curated Destinations</option>
                   {DESTINATIONS.map((d) => (
@@ -220,7 +223,7 @@ export function StayRealityPage() {
                   type="date"
                   value={checkIn}
                   onChange={(e) => setCheckIn(e.target.value)}
-                  className="w-full px-3.5 py-2.5 min-h-[44px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm focus:outline-none focus:border-[#123D3A]"
+                  className="ys-input w-full px-3.5 py-2.5 min-h-[44px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm focus:outline-none"
                 />
               </div>
 
@@ -233,7 +236,7 @@ export function StayRealityPage() {
                   type="date"
                   value={checkOut}
                   onChange={(e) => setCheckOut(e.target.value)}
-                  className="w-full px-3.5 py-2.5 min-h-[44px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm focus:outline-none focus:border-[#123D3A]"
+                  className="ys-input w-full px-3.5 py-2.5 min-h-[44px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm focus:outline-none"
                 />
               </div>
 
@@ -245,7 +248,7 @@ export function StayRealityPage() {
                   id="sr-pax"
                   value={travellers}
                   onChange={(e) => setTravellers(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 min-h-[44px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm focus:outline-none focus:border-[#123D3A]"
+                  className="ys-input w-full px-3.5 py-2.5 min-h-[44px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm focus:outline-none"
                 >
                   {[1, 2, 3, 4, 5, 6].map((n) => (
                     <option key={n} value={n}>
@@ -265,7 +268,7 @@ export function StayRealityPage() {
                   id="sr-budget"
                   value={maxBudget}
                   onChange={(e) => setMaxBudget(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 min-h-[42px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-medium"
+                  className="ys-input w-full px-3.5 py-2.5 min-h-[42px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-medium focus:outline-none"
                 >
                   <option value={0}>Any budget</option>
                   <option value={2000}>Up to ₹2,000 / night</option>
@@ -282,7 +285,7 @@ export function StayRealityPage() {
                   id="sr-clean"
                   value={cleanlinessPref}
                   onChange={(e) => setCleanlinessPref(e.target.value as 'any' | 'audited')}
-                  className="w-full px-3.5 py-2.5 min-h-[42px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-medium"
+                  className="ys-input w-full px-3.5 py-2.5 min-h-[42px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-medium focus:outline-none"
                 >
                   <option value="any">Any listing</option>
                   <option value="audited">Field-noted housekeeping</option>
@@ -297,7 +300,7 @@ export function StayRealityPage() {
                   id="sr-parking"
                   value={parkingPref}
                   onChange={(e) => setParkingPref(e.target.value as 'any' | 'onsite')}
-                  className="w-full px-3.5 py-2.5 min-h-[42px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-medium"
+                  className="ys-input w-full px-3.5 py-2.5 min-h-[42px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-medium focus:outline-none"
                 >
                   <option value="any">Any parking access</option>
                   <option value="onsite">On-site / gated compound</option>
@@ -312,7 +315,7 @@ export function StayRealityPage() {
                   id="sr-network"
                   value={networkPref}
                   onChange={(e) => setNetworkPref(e.target.value as 'any' | 'fiber')}
-                  className="w-full px-3.5 py-2.5 min-h-[42px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-medium"
+                  className="ys-input w-full px-3.5 py-2.5 min-h-[42px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm font-medium focus:outline-none"
                 >
                   <option value="any">Any connectivity</option>
                   <option value="fiber">Strong Fiber + 5G only</option>
@@ -329,7 +332,7 @@ export function StayRealityPage() {
                   value={locationPref}
                   onChange={(e) => setLocationPref(e.target.value)}
                   placeholder="e.g. Old Manali, Bani Park"
-                  className="w-full px-3.5 py-2.5 min-h-[42px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm"
+                  className="ys-input w-full px-3.5 py-2.5 min-h-[42px] rounded-lg bg-[#F8F6F0] border border-[#D7CFC1] text-sm focus:outline-none"
                 />
               </div>
             </div>
@@ -360,52 +363,110 @@ export function StayRealityPage() {
             </div>
           ) : (
             <RevealGroup
-              key={`stays-${destFilter}-${maxBudget}-${parkingPref}-${networkPref}-${cleanlinessPref}`}
-              stagger={STAGGER_STEP}
+              key={`stays-${destFilter}-${maxBudget}-${parkingPref}-${networkPref}-${cleanlinessPref}-${locationPref}`}
+              retriggerKey={`stays-${destFilter}-${maxBudget}-${parkingPref}-${networkPref}-${cleanlinessPref}-${locationPref}`}
+              staggerMs={STAGGER_LIST_MS}
+              maxAnimatedItems={12}
               immediate
               className="grid grid-cols-1 lg:grid-cols-2 gap-8"
             >
-              {filteredStays.map((stay) => {
+              {filteredStays.map((stay, idx) => {
                 const saved = isItemSaved(stay.id, 'stay');
                 const isSelected = selectedHeroStayId === stay.id;
+                const openStayOverlay = () =>
+                  openDetail({
+                    kind: 'stay',
+                    id: stay.id,
+                    stay,
+                    destName: stay.destName,
+                    destState: stay.destState,
+                  });
 
                 return (
-                  <RevealItem key={stay.id} className="h-full">
+                  <RevealItem key={stay.id} index={idx} className="h-full">
                     <MotionCard
-                      hoverLift={-5}
-                      onClick={() =>
-                        openDetail({
-                          kind: 'stay',
-                          id: stay.id,
-                          stay,
-                          destName: stay.destName,
-                          destState: stay.destState,
-                        })
-                      }
                       onMouseEnter={() => preloadHeroImage(stay.images[0])}
-                      className={`group h-full bg-white border rounded-2xl overflow-hidden flex flex-col transition-all duration-300 cursor-pointer ${
+                      className={`group h-full bg-white border rounded-2xl overflow-hidden flex flex-col ${
                         isSelected
-                          ? 'border-[#123D3A] ring-2 ring-[#E9A34A]/65 shadow-md'
-                          : 'border-[#E5DFD3] hover:border-[#123D3A]/45 hover:shadow-xl'
+                          ? 'border-[#123D3A] ring-2 ring-[#E9A34A]/65'
+                          : 'border-[#E5DFD3] hover:border-[#123D3A]/45'
                       }`}
                     >
-                      <div className="aspect-[16/10] overflow-hidden bg-[#EAE4D7] relative">
-                        <SafeImage
-                          src={stay.images[0]}
-                          alt={`${stay.name} in ${stay.destName}`}
-                          className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.06]"
-                        />
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePreviewStay(stay.id, stay.images[0]);
-                          }}
-                          className="absolute bottom-3 left-3 px-3 py-1.5 rounded-lg bg-[#0D2B29]/85 hover:bg-[#E9A34A] hover:text-[#142322] text-white text-sm font-semibold backdrop-blur-xs transition-colors cursor-pointer"
-                        >
-                          {isSelected ? 'Viewing in Hero' : 'Preview in Hero'}
-                        </button>
-                      </div>
+                      <FlipCard
+                        isFlipped={flippedStayId === stay.id}
+                        onFlipChange={(next) => setFlippedStayId(next ? stay.id : null)}
+                        cardLabel={stay.name}
+                        onFrontClick={openStayOverlay}
+                        className="aspect-[16/10] w-full"
+                        roundedClass="rounded-t-2xl"
+                        togglePlacement="top-right"
+                        front={
+                          <div className="w-full h-full relative bg-[#EAE4D7]">
+                            <SafeImage
+                              src={stay.images[0]}
+                              alt={`${stay.name} in ${stay.destName}`}
+                              className="ys-card-img w-full h-full object-cover"
+                            />
+                            <div
+                              className="absolute inset-0 bg-gradient-to-t from-[#0D2B29]/90 via-[#0D2B29]/20 to-transparent pointer-events-none"
+                              aria-hidden="true"
+                            />
+                            <div className="absolute top-3 left-3 pr-14 pointer-events-none">
+                              <span className="inline-block px-2.5 py-1 rounded-full bg-[#0D2B29]/80 text-[#E9A34A] font-mono text-xs uppercase tracking-[0.06em]">
+                                {stay.propertyType} · {stay.destName}
+                              </span>
+                            </div>
+                            <div className="absolute inset-x-4 bottom-3.5 flex items-end justify-between gap-2 text-left pointer-events-none">
+                              <div className="min-w-0">
+                                <p className="text-xs text-[#8CC9E8] font-medium truncate">
+                                  {stay.area}
+                                </p>
+                                <p className="font-editorial text-xl font-semibold text-white leading-snug line-clamp-1 mt-0.5">
+                                  {stay.name}
+                                </p>
+                              </div>
+                              {stay.pricePerNightInr && (
+                                <span className="shrink-0 px-2.5 py-1 rounded-lg bg-white/95 text-[#123D3A] font-mono text-xs font-bold tabular-figures">
+                                  ₹{stay.pricePerNightInr}/nt
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        }
+                        back={
+                          <div className="flex flex-col justify-between h-full gap-3">
+                            <div className="space-y-1.5 pr-11">
+                              <p className="eyebrow-mono text-[#E9A34A]">
+                                {stay.verificationStatus} · {stay.verificationDate}
+                              </p>
+                              <h4 className="font-editorial text-lg font-bold text-white leading-snug line-clamp-1">
+                                {stay.name}
+                              </h4>
+                              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                <span className="px-2 py-0.5 rounded-full bg-white/12 border border-white/18 text-[11px] font-medium text-[#8CC9E8]">
+                                  {stay.parkingAvailable ? 'On-site Parking' : 'Walk-in Lane'}
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full bg-white/12 border border-white/18 text-[11px] font-medium text-[#8CC9E8]">
+                                  {stay.networkQuality}
+                                </span>
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-[#F8F6F0]/85 leading-relaxed line-clamp-2 border-y border-white/15 py-2">
+                              <strong className="text-[#E9A34A]">Extra / Utility Notes:</strong> {stay.hiddenCharges}
+                            </p>
+
+                            <Link
+                              to={`/stay-reality/${stay.id}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="ys-btn-primary w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[40px] rounded-xl bg-[#E9A34A] hover:bg-[#DF9538] text-[#142322] text-sm font-bold"
+                            >
+                              <span>View details</span>
+                              <ArrowRight className="ys-arrow w-4 h-4" aria-hidden="true" />
+                            </Link>
+                          </div>
+                        }
+                      />
 
                       <div className="p-6 flex-1 flex flex-col justify-between space-y-5">
                         <div className="space-y-3">
@@ -413,14 +474,27 @@ export function StayRealityPage() {
                             <p className="text-sm text-[#5A6664]">
                               {stay.destName}, {stay.destState} <span aria-hidden="true">·</span> {stay.propertyType}
                             </p>
-                            <p className="text-sm font-medium text-[#123D3A]">
-                              {stay.verificationStatus} · {stay.verificationDate}
-                            </p>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePreviewStay(stay.id, stay.images[0]);
+                              }}
+                              className="ys-chip px-2.5 py-1 rounded-md bg-[#F8F6F0] border border-[#E5DFD3] hover:border-[#123D3A] text-xs font-semibold text-[#123D3A] cursor-pointer"
+                            >
+                              {isSelected ? 'Viewing in Hero' : 'Preview in Hero'}
+                            </button>
                           </div>
 
                           <div className="flex items-start justify-between gap-4">
                             <h2 className="font-editorial text-2xl font-semibold text-[#123D3A] group-hover:text-[#E9A34A] transition-colors">
-                              {stay.name}
+                              <button
+                                type="button"
+                                onClick={openStayOverlay}
+                                className="text-left cursor-pointer hover:underline"
+                              >
+                                {stay.name}
+                              </button>
                             </h2>
                             {stay.pricePerNightInr && (
                               <div className="text-right shrink-0">
@@ -486,7 +560,7 @@ export function StayRealityPage() {
                                 setSaveFeedback(err instanceof Error ? err.message : 'Sign in to save stays.');
                               }
                             }}
-                            className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-[42px] rounded-lg border text-sm font-semibold transition-colors cursor-pointer ${
+                            className={`ys-chip inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-[42px] rounded-lg border text-sm font-semibold cursor-pointer ${
                               saved
                                 ? 'border-[#E9A34A] bg-[#E9A34A]/15 text-[#123D3A]'
                                 : 'border-[#D7CFC1] text-[#5A6664] hover:text-[#123D3A]'
@@ -499,11 +573,11 @@ export function StayRealityPage() {
                           <Link
                             to={`/stay-reality/${stay.id}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[42px] rounded-lg bg-[#123D3A] text-white text-sm font-semibold hover:bg-[#194E4A] transition-colors"
+                            className="ys-btn-primary inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[42px] rounded-lg bg-[#123D3A] text-white text-sm font-semibold hover:bg-[#194E4A]"
                           >
                             <ShieldCheck className="w-4 h-4 text-[#E9A34A]" aria-hidden="true" />
                             Inspect Stay Reality
-                            <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                            <ArrowRight className="ys-arrow w-4 h-4" aria-hidden="true" />
                           </Link>
                         </div>
                       </div>

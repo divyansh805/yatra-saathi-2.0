@@ -20,6 +20,9 @@ import indianRailwayArrivalImg from '../assets/images/transit_indian_arrival_179
 import vehicleBikeTaxiImg from '../assets/images/vehicle_bike_taxi_1794893590187.jpg';
 import vehicleAutoRickshawImg from '../assets/images/vehicle_auto_rickshaw_1794893590208.jpg';
 import vehicleSedanCabImg from '../assets/images/vehicle_sedan_cab_1794893590335.jpg';
+import natureWildlifeImg from '../assets/images/nature_wildlife_india_1795021063061.jpg';
+import travelAssistHeroCorridorImg from '../assets/images/travel_assist_hero_corridor_1795023168809.jpg';
+import jammuKatraShrineHillsImg from '../assets/images/jammu_katra_shrine_hills_1795023168476.jpg';
 
 // Ground-verified local photography bundled as static ES modules for every Indian destination & experience
 export const IMAGES = {
@@ -44,6 +47,9 @@ export const IMAGES = {
   vehicleBikeTaxi: vehicleBikeTaxiImg,
   vehicleAutoRickshaw: vehicleAutoRickshawImg,
   vehicleSedanCab: vehicleSedanCabImg,
+  natureWildlife: natureWildlifeImg,
+  travelAssistHeroCorridor: travelAssistHeroCorridorImg,
+  jammuKatraShrineHills: jammuKatraShrineHillsImg,
 } as const;
 
 export const DESTINATIONS: DestinationProfile[] = [
@@ -722,7 +728,7 @@ export const DESTINATIONS: DestinationProfile[] = [
     coords: { lat: 9.4981, lng: 76.3388 },
     bestSeason: 'November to February',
     groundIntelligence:
-      'You do not need an expensive private houseboat to experience Alleppey canals. Kerala State Water Transport Dept (SWTD) wooden ferries run from Alappuzha Boat Jetty to Kottayam & Kainakary for ₹15–₹40.',
+      'You do not need an expensive private houseboat to experience Alleppey canals. Kerala State Water Transport Dept (SWTD) public wooden ferries run between Alappuzha Boat Jetty, Kottayam & Kainakary — check posted jetty fare boards before boarding.',
     arrivalHubs: [
       {
         id: 'alleppey-rail',
@@ -768,11 +774,11 @@ export const DESTINATIONS: DestinationProfile[] = [
         fullDescription:
           'Smaller wooden canoes (shikaras) can enter narrow village canals that large kettuvallams cannot reach. Early morning trips reveal coir spinning, toddy tapping, and migratory kingfishers.',
         bestVisitingTime: '6:30 AM – 9:30 AM or 4:00 PM – 6:00 PM',
-        openingHours: 'SWTD ferries operate 5:30 AM – 9:00 PM',
-        openingHoursVerified: true,
-        entryFee: '₹15–₹40 public SWTD ferry · ₹700/hr small shikara canoe',
-        entryFeeVerified: true,
-        sourceNote: 'Kerala SWTD published timetable',
+        openingHours: 'SWTD ferries typically run morning through evening (verify jetty schedule)',
+        openingHoursVerified: false,
+        entryFee: 'Verify SWTD public ferry & local shikara rates at jetty counter',
+        entryFeeVerified: false,
+        sourceNote: 'Kerala SWTD boat jetty reference',
       },
     ],
     cafes: [
@@ -852,6 +858,168 @@ export const DESTINATIONS: DestinationProfile[] = [
         sourceName: 'Yatra Saathi Ground Audit Notes',
         ownerContact: null,
         bookingReferenceUrl: 'https://www.google.com/maps/search/?api=1&query=Alappuzha+Homestay',
+      },
+    ],
+  },
+  {
+    id: 'katra-jammu',
+    name: 'Katra & Jammu',
+    state: 'Jammu and Kashmir',
+    tagline: 'Trikuta foothill shrines, Tawi river forts, and Dogra palace heritage.',
+    heroImage: IMAGES.jammuKatraShrineHills,
+    coords: { lat: 32.9916, lng: 74.9319 },
+    bestSeason: 'March to June & September to November',
+    groundIntelligence:
+      'Vaishno Devi pilgrims must obtain a free RFID Yatra Registration slip in Katra before crossing Banganga Darshani Deodi. Prepaid auto and taxi counters sit right outside Katra Railway Station (SVDK) Gate 1; Jammu Tawi (JAT) sits ~46 km south along NH-144.',
+    arrivalHubs: [
+      {
+        id: 'svdk-rail',
+        name: 'Shri Mata Vaishno Devi Katra Railway Station (SVDK)',
+        type: 'Railway Station',
+        lat: 32.9813,
+        lng: 74.9498,
+        groundTip: 'Official auto and taxi stands operate right outside Gate 1; Banganga yatra gate is ~2.5 km uphill.',
+      },
+      {
+        id: 'jat-rail',
+        name: 'Jammu Tawi Railway Station (JAT)',
+        type: 'Railway Station',
+        lat: 32.7072,
+        lng: 74.8808,
+        groundTip: 'Prepaid taxi stand sits outside Main Concourse; JKSRTC buses to Katra leave frequently from the main yard.',
+      },
+      {
+        id: 'ixj-air',
+        name: 'Jammu Airport (IXJ)',
+        type: 'Airport',
+        lat: 32.6891,
+        lng: 74.8374,
+        groundTip: 'Satwari civil enclave is ~6 km from Raghunath Bazaar and ~48 km from Katra base town.',
+      },
+    ],
+    popularStaysAreas: [
+      { id: 'katra-fountain', name: 'Katra Main Chowk & Railway Road', lat: 32.9916, lng: 74.9319 },
+      { id: 'jammu-residency', name: 'Residency Road & Hari Market, Jammu', lat: 32.731, lng: 74.864 },
+    ],
+    attractions: [
+      {
+        id: 'banganga-darshani-deodi',
+        destinationId: 'katra-jammu',
+        name: 'Banganga Darshani Deodi (Vaishno Devi Yatra Gate)',
+        category: 'Popular',
+        location: 'Banganga Foothills, Katra',
+        lat: 32.9977,
+        lng: 74.9347,
+        image: IMAGES.jammuKatraShrineHills,
+        shortDescription:
+          'Traditional pedestrian gateway marking the start of the 13 km Trikuta ascent to Vaishno Devi Bhawan.',
+        fullDescription:
+          'Banganga serves as the primary starting arch and RFID verification point for the trek toward Ardhkuwari, Sanjichhat, and Bhawan. Autos and cabs drop pilgrims right near the Banganga chowk turnaround.',
+        bestVisitingTime: 'Early morning or late evening (cooler climb)',
+        openingHours: 'Open 24 hours (RFID counters operate continuously; verify locally)',
+        openingHoursVerified: false,
+        entryFee: 'Free pilgrimage access (RFID Yatra slip required)',
+        entryFeeVerified: true,
+        sourceNote: 'Shri Mata Vaishno Devi Shrine Board published yatra rules',
+      },
+      {
+        id: 'raghunath-temple-jammu',
+        destinationId: 'katra-jammu',
+        name: 'Raghunath Temple & Bahu Fort',
+        category: 'Historical',
+        location: 'Old City & Tawi South Ridge, Jammu',
+        lat: 32.733,
+        lng: 74.8673,
+        image: IMAGES.travelAssistHeroCorridor,
+        shortDescription:
+          '19th-century Dogra temple complex in central Jammu paired with the cliffside Bahu Fort across the Tawi River.',
+        fullDescription:
+          'Built by Maharaja Gulab Singh and Maharaja Ranbir Singh, Raghunath Temple sits beside Jammu’s historic bazaars. Across the Tawi bridge, Bahu Fort and Bagh-e-Bahu terraced gardens overlook the river valley.',
+        bestVisitingTime: 'Morning 7:30 AM – 10:30 AM or sunset at Bagh-e-Bahu',
+        openingHours: 'Check temple & garden hours locally',
+        openingHoursVerified: false,
+        entryFee: 'Temple free · Bagh-e-Bahu nominal park entry',
+        entryFeeVerified: false,
+        sourceNote: 'Jammu & Kashmir Tourism directory',
+      },
+    ],
+    cafes: [
+      {
+        id: 'trikuta-kahwa-corner',
+        destinationId: 'katra-jammu',
+        name: 'Trikuta Foothills Kahwa & Tea House',
+        setting: 'Mountain Foothill Cafe',
+        location: 'Katra Fountain Chowk',
+        lat: 32.9918,
+        lng: 74.9312,
+        image: IMAGES.cafeMountain,
+        shortDescription:
+          'Quiet tea terrace serving saffron Kahwa, light vegetarian thalis, and warm resting booths near Katra Chowk.',
+        fullDescription:
+          'Convenient stop for solo travellers and families resting before or after the Trikuta trek, with clean washrooms and mobile charging points.',
+        tags: ['Solo Friendly', 'Budget Friendly'],
+        priceRange: '₹120 – ₹280 for tea & snacks',
+        priceSource: 'Local street & cafe menu estimate',
+        openingHours: 'Hours unverified — verify locally',
+        hoursVerified: false,
+        soloTravellerNote: 'Bright ground-floor tables along the main chowk; safe late-evening lighting.',
+        mapsQueryUrl: 'https://www.google.com/maps/search/?api=1&query=Katra+Main+Chowk+Jammu',
+      },
+    ],
+    adventures: [
+      {
+        id: 'tarakote-marg-ridge-walk',
+        destinationId: 'katra-jammu',
+        name: 'Tarakote Marg Eco Trail & Sanjichhat Ridge',
+        activityType: 'Mountain Trekking',
+        location: 'Tarakote Marg Trailhead, Katra',
+        lat: 33.0056,
+        lng: 74.9389,
+        image: IMAGES.adventureTrekking,
+        shortDescription:
+          'Dedicated pedestrian-only stone-paved mountain trail linking Katra foothills up toward Ardhkuwari and Sanjichhat.',
+        fullDescription:
+          'Built exclusively for foot pilgrims free of ponies, Tarakote Marg winds gently across pine slopes with shaded shelters, drinking water stations, and valley viewpoints.',
+        approxCost: 'Free pedestrian track (Battery car & helicopter tariffs regulated by Shrine Board)',
+        costBasis: 'Shri Mata Vaishno Devi Shrine Board published tariff',
+        duration: '3 – 5 hours uphill',
+        seasonWindow: 'Year-round (carry warm layers Nov – Feb)',
+        safetyRequirements: 'Wear cushioned walking shoes; carry water and light woolens in winter.',
+        ageRequirement: 'All ages (medical advisory for steep climb)',
+        operatorLink: null,
+        operatorLabel: 'Shri Mata Vaishno Devi Shrine Board',
+      },
+    ],
+    stays: [
+      {
+        id: 'trikuta-ridge-lodge',
+        destinationId: 'katra-jammu',
+        name: 'Trikuta Ridge Pilgrim Lodge',
+        propertyType: 'Foothill Guesthouse',
+        area: 'Railway Road, Katra',
+        location: '1.1 km from Katra Railway Station (SVDK)',
+        lat: 32.9875,
+        lng: 74.9404,
+        images: [IMAGES.homestayRoom, IMAGES.jammuKatraShrineHills],
+        pricePerNightInr: 1850,
+        priceSource: 'Indicative off-peak tariff',
+        landmarkDistances: [
+          { landmark: 'Katra Railway Station (SVDK)', distance: '1.1 km' },
+          { landmark: 'Banganga Yatra Gate', distance: '2.1 km' },
+        ],
+        facilities: ['24h Hot Water', 'Luggage Cloakroom', 'Pure Veg Kitchen', 'Auto Stand Pickup'],
+        cleanlinessInfo:
+          'Fresh cotton bedding changed per checkout; heated geysers operational round-the-clock for early-morning yatra departures.',
+        parkingInfo: 'Dedicated compound parking for 6 cars near Railway Road gate.',
+        parkingAvailable: true,
+        networkInfo: 'Foothill fiber broadband (35 Mbps) + reliable Jio/Airtel 4G/5G in Katra.',
+        networkQuality: 'Strong Fiber + 5G',
+        hiddenCharges: 'None on room tariff; room heater billed at ₹200/night during winter.',
+        verificationStatus: 'Public Listing + Field Notes',
+        verificationDate: '2026-10-28',
+        sourceName: 'Yatra Saathi Ground Audit Notes',
+        ownerContact: null,
+        bookingReferenceUrl: 'https://www.google.com/maps/search/?api=1&query=Katra+Railway+Road+Hotels',
       },
     ],
   },

@@ -15,7 +15,8 @@ import { Navbar } from '../../components/Navbar';
 import { Footer } from '../../components/Footer';
 import { SafeImage } from '../../components/SafeImage';
 import { GoogleRouteMap } from '../../components/GoogleRouteMap';
-import { Reveal } from '../../components/Reveal';
+import { Reveal, RevealGroup, RevealItem } from '../../components/Reveal';
+import { STAGGER_CARDS_MS, STAGGER_LIST_MS } from '../../motion/tokens';
 import { DESTINATIONS, getDestinationById } from '../../data/destinations';
 import { useApp } from '../../contexts/AppContext';
 import type { WeatherSnapshot } from '../../types/travel';
@@ -127,7 +128,7 @@ export function DetailPage() {
           <button
             type="button"
             onClick={handleSave}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 min-h-[42px] rounded-lg border text-sm font-semibold transition-colors cursor-pointer ${
+            className={`ys-chip inline-flex items-center gap-2 px-4 py-2.5 min-h-[42px] rounded-lg border text-sm font-semibold cursor-pointer ${
               saved
                 ? 'border-[#E9A34A] bg-[#E9A34A]/15 text-[#123D3A]'
                 : 'border-[#D7CFC1] bg-white text-[#123D3A] hover:bg-[#EFECE3]'
@@ -147,11 +148,11 @@ export function DetailPage() {
         {/* Hero Photo + Summary */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           <Reveal immediate className="lg:col-span-7 space-y-6">
-            <div className="aspect-[16/10] rounded-xl overflow-hidden border border-[#E5DFD3] bg-white group">
+            <div className="ys-card aspect-[16/10] rounded-xl overflow-hidden border border-[#E5DFD3] bg-white">
               <SafeImage
                 src={item.image}
                 alt={item.name}
-                className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.04]"
+                className="ys-card-img w-full h-full object-cover"
               />
             </div>
 
@@ -167,105 +168,129 @@ export function DetailPage() {
           </Reveal>
 
           {/* Ground Intelligence Panel */}
-          <Reveal immediate delay={0.08} className="lg:col-span-5 space-y-5">
+          <Reveal immediate delayMs={STAGGER_CARDS_MS} className="lg:col-span-5 space-y-5">
             <div className="bg-white border border-[#E5DFD3] rounded-xl p-6 space-y-4">
               <h2 className="font-editorial text-xl font-semibold text-[#123D3A]">
                 Practical Details
               </h2>
 
               {resolved.kind === 'attraction' && (
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-start gap-2.5">
-                    <Clock className="w-4 h-4 text-[#E9A34A] shrink-0 mt-0.5" />
-                    <div>
-                      <p className="eyebrow-mono text-[#5A6664]">Best Visiting Time</p>
-                      <p className="font-medium mt-0.5">{resolved.item.bestVisitingTime}</p>
+                <RevealGroup immediate staggerMs={STAGGER_LIST_MS} maxAnimatedItems={12} className="space-y-3 text-sm">
+                  <RevealItem index={0}>
+                    <div className="flex items-start gap-2.5">
+                      <Clock className="w-4 h-4 text-[#E9A34A] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="eyebrow-mono text-[#5A6664]">Best Visiting Time</p>
+                        <p className="font-medium mt-0.5">{resolved.item.bestVisitingTime}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <Clock className="w-4 h-4 text-[#123D3A] shrink-0 mt-0.5" />
-                    <div>
-                      <p className="eyebrow-mono text-[#5A6664]">
-                        Opening Hours ({resolved.item.openingHoursVerified ? 'Verified' : 'Unverified'})
-                      </p>
-                      <p className="font-medium mt-0.5">{resolved.item.openingHours}</p>
+                  </RevealItem>
+                  <RevealItem index={1}>
+                    <div className="flex items-start gap-2.5">
+                      <Clock className="w-4 h-4 text-[#123D3A] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="eyebrow-mono text-[#5A6664]">
+                          Opening Hours ({resolved.item.openingHoursVerified ? 'Verified' : 'Unverified'})
+                        </p>
+                        <p className="font-medium mt-0.5">{resolved.item.openingHours}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <Ticket className="w-4 h-4 text-[#123D3A] shrink-0 mt-0.5" />
-                    <div>
-                      <p className="eyebrow-mono text-[#5A6664]">
-                        Entry Fee ({resolved.item.entryFeeVerified ? 'Verified' : 'Unverified'})
-                      </p>
-                      <p className="font-medium mt-0.5">{resolved.item.entryFee}</p>
+                  </RevealItem>
+                  <RevealItem index={2}>
+                    <div className="flex items-start gap-2.5">
+                      <Ticket className="w-4 h-4 text-[#123D3A] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="eyebrow-mono text-[#5A6664]">
+                          Entry Fee ({resolved.item.entryFeeVerified ? 'Verified' : 'Unverified'})
+                        </p>
+                        <p className="font-medium mt-0.5">{resolved.item.entryFee}</p>
+                      </div>
                     </div>
-                  </div>
-                  <p className="text-sm text-[#5A6664] pt-2 border-t border-[#E5DFD3]">
-                    Source: {resolved.item.sourceNote}
-                  </p>
-                </div>
+                  </RevealItem>
+                  <RevealItem index={3}>
+                    <p className="text-sm text-[#5A6664] pt-2 border-t border-[#E5DFD3]">
+                      Source: {resolved.item.sourceNote}
+                    </p>
+                  </RevealItem>
+                </RevealGroup>
               )}
 
               {resolved.kind === 'cafe' && (
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <p className="eyebrow-mono text-[#5A6664]">Solo Traveller Note</p>
-                    <p className="font-medium mt-0.5">{resolved.item.soloTravellerNote}</p>
-                  </div>
-                  <div>
-                    <p className="eyebrow-mono text-[#5A6664]">Tags</p>
-                    <p className="font-medium text-[#123D3A] mt-0.5">{resolved.item.tags.join(' · ')}</p>
-                  </div>
-                  <div>
-                    <p className="eyebrow-mono text-[#5A6664]">
-                      Indicative Price ({resolved.item.priceSource})
-                    </p>
-                    <p className="font-medium mt-0.5">{resolved.item.priceRange || 'Not publicly listed'}</p>
-                  </div>
-                  <div>
-                    <p className="eyebrow-mono text-[#5A6664]">
-                      Opening Hours ({resolved.item.hoursVerified ? 'Verified' : 'Unverified'})
-                    </p>
-                    <p className="font-medium mt-0.5">{resolved.item.openingHours || 'Check before visiting'}</p>
-                  </div>
-                </div>
+                <RevealGroup immediate staggerMs={STAGGER_LIST_MS} maxAnimatedItems={12} className="space-y-3 text-sm">
+                  <RevealItem index={0}>
+                    <div>
+                      <p className="eyebrow-mono text-[#5A6664]">Solo Traveller Note</p>
+                      <p className="font-medium mt-0.5">{resolved.item.soloTravellerNote}</p>
+                    </div>
+                  </RevealItem>
+                  <RevealItem index={1}>
+                    <div>
+                      <p className="eyebrow-mono text-[#5A6664]">Tags</p>
+                      <p className="font-medium text-[#123D3A] mt-0.5">{resolved.item.tags.join(' · ')}</p>
+                    </div>
+                  </RevealItem>
+                  <RevealItem index={2}>
+                    <div>
+                      <p className="eyebrow-mono text-[#5A6664]">
+                        Indicative Price ({resolved.item.priceSource})
+                      </p>
+                      <p className="font-medium mt-0.5">{resolved.item.priceRange || 'Not publicly listed'}</p>
+                    </div>
+                  </RevealItem>
+                  <RevealItem index={3}>
+                    <div>
+                      <p className="eyebrow-mono text-[#5A6664]">
+                        Opening Hours ({resolved.item.hoursVerified ? 'Verified' : 'Unverified'})
+                      </p>
+                      <p className="font-medium mt-0.5">{resolved.item.openingHours || 'Check before visiting'}</p>
+                    </div>
+                  </RevealItem>
+                </RevealGroup>
               )}
 
               {resolved.kind === 'adventure' && (
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <p className="eyebrow-mono text-[#5A6664]">Duration & Season</p>
-                    <p className="font-medium mt-0.5">
-                      {resolved.item.duration} · {resolved.item.seasonWindow}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="eyebrow-mono text-[#5A6664]">Cost ({resolved.item.costBasis})</p>
-                    <p className="font-medium font-mono mt-0.5">{resolved.item.approxCost || 'Check operator'}</p>
-                  </div>
-                  <div className="flex items-start gap-2.5 bg-[#F8F6F0] border border-[#E5DFD3] rounded-lg p-3.5">
-                    <ShieldAlert className="w-4 h-4 text-[#E9A34A] shrink-0 mt-0.5" />
+                <RevealGroup immediate staggerMs={STAGGER_LIST_MS} maxAnimatedItems={12} className="space-y-3 text-sm">
+                  <RevealItem index={0}>
                     <div>
-                      <p className="text-sm font-semibold text-[#123D3A]">
-                        Safety & Age ({resolved.item.ageRequirement})
-                      </p>
-                      <p className="text-sm text-[#495553] mt-0.5">
-                        {resolved.item.safetyRequirements}
+                      <p className="eyebrow-mono text-[#5A6664]">Duration & Season</p>
+                      <p className="font-medium mt-0.5">
+                        {resolved.item.duration} · {resolved.item.seasonWindow}
                       </p>
                     </div>
-                  </div>
+                  </RevealItem>
+                  <RevealItem index={1}>
+                    <div>
+                      <p className="eyebrow-mono text-[#5A6664]">Cost ({resolved.item.costBasis})</p>
+                      <p className="font-medium font-mono mt-0.5">{resolved.item.approxCost || 'Check operator'}</p>
+                    </div>
+                  </RevealItem>
+                  <RevealItem index={2}>
+                    <div className="flex items-start gap-2.5 bg-[#F8F6F0] border border-[#E5DFD3] rounded-lg p-3.5">
+                      <ShieldAlert className="w-4 h-4 text-[#E9A34A] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-[#123D3A]">
+                          Safety & Age ({resolved.item.ageRequirement})
+                        </p>
+                        <p className="text-sm text-[#495553] mt-0.5">
+                          {resolved.item.safetyRequirements}
+                        </p>
+                      </div>
+                    </div>
+                  </RevealItem>
                   {resolved.item.operatorLink && (
-                    <a
-                      href={resolved.item.operatorLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#123D3A] underline"
-                    >
-                      {resolved.item.operatorLabel}
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
+                    <RevealItem index={3}>
+                      <a
+                        href={resolved.item.operatorLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#123D3A] underline"
+                      >
+                        {resolved.item.operatorLabel}
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </RevealItem>
                   )}
-                </div>
+                </RevealGroup>
               )}
 
               {/* Weather Widget */}
@@ -293,14 +318,14 @@ export function DetailPage() {
                   href={directionsHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-4 py-2.5 min-h-[44px] rounded-lg bg-[#123D3A] text-white text-sm font-semibold hover:bg-[#194E4A] transition-colors inline-flex items-center justify-center gap-1.5"
+                  className="ys-btn-secondary px-4 py-2.5 min-h-[44px] rounded-lg bg-[#123D3A] text-white text-sm font-semibold hover:bg-[#194E4A] inline-flex items-center justify-center gap-1.5"
                 >
                   <MapPin className="w-4 h-4" />
                   Directions
                 </a>
                 <Link
                   to={`/travel-assist?dest=${dest.id}&target=${encodeURIComponent(item.name)}&lat=${item.lat}&lng=${item.lng}`}
-                  className="px-4 py-2.5 min-h-[44px] rounded-lg bg-[#E9A34A] text-[#142322] text-sm font-semibold hover:bg-[#df9538] transition-colors inline-flex items-center justify-center gap-1.5"
+                  className="ys-btn-primary px-4 py-2.5 min-h-[44px] rounded-lg bg-[#E9A34A] text-[#142322] text-sm font-semibold hover:bg-[#df9538] inline-flex items-center justify-center gap-1.5"
                 >
                   <Navigation className="w-4 h-4" />
                   Compare Rides

@@ -64,11 +64,11 @@ export function DashboardPage() {
     {
       index: '01',
       title: 'Travel Assist',
-      description: 'Compare rides and reach your first destination confidently.',
-      cta: 'Open Travel Assist',
+      description: 'Understand local fares, manage important timings and find useful stops along your journey.',
+      cta: 'Open Smart Local Hop',
       to: '/travel-assist',
       image: IMAGES.travelAssist,
-      alt: 'Travel Assist railway station arrival rides',
+      alt: 'Smart Local Hop Indian local transit intelligence',
     },
     {
       index: '02',

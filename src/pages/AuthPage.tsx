@@ -325,7 +325,7 @@ export function AuthPage({ initialMode = 'login' }: { initialMode?: AuthMode }) 
             “Know what awaits beyond the station gate before your train arrives.”
           </p>
           <p className="text-base text-[#F8F6F0]/85 leading-relaxed">
-            Compare arrival rides, save attraction routes, and access ground-checked stay notes across India.
+            Plan smart local hops, save attraction routes, and check ground-level stay notes across India.
           </p>
         </Reveal>
       </div>

@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 200ms;
+  --dur-route: 300ms;
+  --dur-base: 400ms;
+  --dur-slow: 600ms;
+  --dur-slide: 650ms;
+  --dur-flip: 700ms;
+  --stagger-cards: 70ms;
+  --stagger-list: 40ms;
+}
+
 @theme {
   --font-serif: "Fraunces", Georgia, Cambria, "Times New Roman", serif;
   --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -33,33 +45,33 @@
     overflow-x: clip;
   }
 
-  html.lenis,
-  html.lenis body {
-    height: auto;
+  /* Consistent accessible focus ring & pointer discipline across controls */
+  a,
+  button,
+  select,
+  [role="button"],
+  [role="tab"] {
+    cursor: pointer;
   }
 
-  .lenis.lenis-smooth {
-    scroll-behavior: auto !important;
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
   }
 
-  .lenis.lenis-smooth [data-lenis-prevent] {
-    overscroll-behavior: contain;
-  }
-
-  .lenis.lenis-stopped {
-    overflow: hidden;
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid #E9A34A;
+    outline-offset: 2px;
   }
 
   @media (prefers-reduced-motion: reduce) {
     html {
       scroll-behavior: auto;
-    }
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
     }
   }
 }
@@ -76,13 +88,375 @@
   text-wrap: balance;
 }
 
-/* Mono uppercase eyebrow utility (12-13px with generous letter-spacing) */
+/* Mono uppercase eyebrow utility */
 .eyebrow-mono {
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  line-height: 1.3;
+  line-height: 1.45;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  overflow-wrap: break-word;
+}
+
+/* ==========================================================================
+ * UNIFIED MOTION SYSTEM — COMPOSITOR ONLY (transform & opacity)
+ * ========================================================================== */
+
+/* 1. Once-only IntersectionObserver scroll & load reveals */
+.ys-reveal-y {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0);
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+.ys-reveal-y[data-visible="true"] {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.ys-reveal-x {
+  opacity: 0;
+  transform: translate3d(80px, 0, 0);
+  transition:
+    opacity var(--dur-slide) var(--ease-out),
+    transform var(--dur-slide) var(--ease-out);
+}
+.ys-reveal-x[data-visible="true"] {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.ys-reveal-instant {
+  opacity: 1;
+  transform: none;
+}
+
+.ys-word-mask {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.ys-word-inner {
+  display: inline-block;
+  opacity: 0;
+  transform: translate3d(0, 100%, 0);
+  transition:
+    opacity var(--dur-slow) var(--ease-out),
+    transform var(--dur-slow) var(--ease-out);
+}
+.ys-word-mask[data-visible="true"] .ys-word-inner {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+/* 2. Cards hover lift + pseudo-element shadow opacity + child image zoom + icon float */
+.ys-card {
+  position: relative;
+  transition:
+    transform 300ms var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+.ys-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 22px 46px -12px rgba(10, 24, 22, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms var(--ease-out);
+  z-index: 0;
+}
+.ys-card-dark::before {
+  box-shadow: 0 24px 52px -12px rgba(0, 0, 0, 0.65);
+}
+
+.ys-card-img {
+  transition: transform 300ms var(--ease-out);
+}
+
+.ys-icon-float {
+  display: inline-flex;
+  transition: transform 300ms var(--ease-out);
+}
+
+/* 3. Buttons & Primary Saffron Sheen + Secondary Teal Tint */
+.ys-btn-primary {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+.ys-btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 55%;
+  background: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.36) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translate3d(-160%, 0, 0);
+  transition: transform 520ms var(--ease-out);
+  pointer-events: none;
+}
+.ys-btn-primary .ys-arrow {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.ys-btn-secondary {
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.ys-btn-secondary:hover {
+  background-color: rgba(18, 61, 58, 0.08);
+  border-color: rgba(18, 61, 58, 0.55);
+}
+
+/* 4. Filter chips & tabs */
+.ys-chip {
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.ys-chip:active {
+  transform: scale(0.97);
+}
+
+/* 5. Navbar sliding hover underline from left */
+.ys-nav-link {
+  position: relative;
+}
+.ys-nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  border-radius: 9999px;
+  background-color: #E9A34A;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 240ms var(--ease-out);
+  pointer-events: none;
+}
+
+/* 6. Planner Inputs & Swap Rotate */
+.ys-input {
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+.ys-input:focus {
+  border-color: #123D3A;
+  box-shadow: 0 0 0 3px rgba(18, 61, 58, 0.14);
+}
+.ys-swap-btn {
+  transition:
+    transform 320ms var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+.ys-swap-btn[data-swapped="true"] svg {
+  transform: rotate(180deg);
+}
+.ys-swap-btn svg {
+  transition: transform 320ms var(--ease-out);
+}
+
+/* 7. 3D Flip Card Architecture */
+.flip-card {
+  perspective: 1200px;
+  position: relative;
+}
+.flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--dur-flip) var(--ease-out);
+}
+.flip-card[data-flipped="true"] .flip-inner {
+  transform: rotateY(180deg);
+}
+.face-front,
+.face-back {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.face-front {
+  transform: rotateY(0deg);
+  z-index: 2;
+}
+.face-back {
+  transform: rotateY(180deg);
+  z-index: 1;
+}
+.flip-card[data-flipped="true"] .face-back {
+  z-index: 3;
+}
+
+/* Hover interactions ONLY on true hover pointers (Desktop) */
+@media (hover: hover) and (pointer: fine) {
+  .ys-card:hover {
+    transform: translate3d(0, -6px, 0);
+  }
+  .ys-card:hover::before {
+    opacity: 1;
+  }
+  .ys-card:hover .ys-card-img {
+    transform: scale(1.06);
+  }
+  .ys-card:hover .ys-icon-float {
+    transform: translate3d(0, -2px, 0) rotate(-5deg);
+  }
+
+  .ys-btn-primary:hover:not(:disabled) {
+    transform: translate3d(0, -2px, 0);
+  }
+  .ys-btn-primary:hover:not(:disabled)::after {
+    transform: translate3d(240%, 0, 0);
+  }
+  .ys-btn-primary:hover:not(:disabled) .ys-arrow {
+    transform: translate3d(4px, 0, 0);
+  }
+
+  .ys-chip:hover {
+    transform: scale(1.04);
+  }
+  .ys-chip:active {
+    transform: scale(0.97);
+  }
+
+  .ys-nav-link:hover::after {
+    transform: scaleX(1);
+  }
+}
+
+/* Touch screens: disable hover lifts/zooms/sheens; crisp active tap scale */
+@media (hover: none) {
+  .ys-card:active,
+  .ys-btn-primary:active:not(:disabled),
+  .ys-btn-secondary:active,
+  .ys-chip:active {
+    transform: scale(0.97);
+  }
+}
+
+/* Lightweight compositor slide utility for reactive list updates */
+@keyframes ys-card-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 20px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.card-reveal {
+  animation: ys-card-reveal var(--dur-base) var(--ease-out) both;
+}
+
+@keyframes ys-card-slide-x {
+  from {
+    opacity: 0;
+    transform: translate3d(48px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.card-reveal-horizontal {
+  animation: ys-card-slide-x var(--dur-base) var(--ease-out) both;
+}
+
+/* Reduced motion accessibility: disable transforms/slides/flips/sheens, preserve fast 150ms opacity fade */
+@media (prefers-reduced-motion: reduce) {
+  .ys-reveal-y,
+  .ys-reveal-x,
+  .ys-word-inner {
+    transform: none !important;
+    transition: opacity 150ms ease-out !important;
+  }
+  .ys-reveal-y[data-visible="true"],
+  .ys-reveal-x[data-visible="true"],
+  .ys-word-mask[data-visible="true"] .ys-word-inner {
+    opacity: 1;
+    transform: none !important;
+  }
+
+  .card-reveal,
+  .card-reveal-horizontal {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .ys-card:hover,
+  .ys-card:hover .ys-card-img,
+  .ys-card:hover .ys-icon-float,
+  .ys-btn-primary:hover,
+  .ys-chip:hover,
+  .ys-chip:active {
+    transform: none !important;
+  }
+  .ys-btn-primary::after {
+    display: none !important;
+  }
+
+  /* 3D Flip fallback: opacity cross-fade instead of rotateY */
+  .flip-card {
+    perspective: none;
+  }
+  .flip-inner {
+    transform-style: flat;
+    transition: none !important;
+    transform: none !important;
+  }
+  .flip-card[data-flipped="true"] .flip-inner {
+    transform: none !important;
+  }
+  .face-front,
+  .face-back {
+    backface-visibility: visible;
+    -webkit-backface-visibility: visible;
+    transform: none !important;
+    transition: opacity 150ms ease-out !important;
+  }
+  .face-front {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .face-back {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .flip-card[data-flipped="true"] .face-front {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .flip-card[data-flipped="true"] .face-back {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 /* Shimmer skeleton animation using compositor transform */
@@ -112,7 +486,7 @@
     rgba(255, 255, 255, 0.55) 50%,
     rgba(255, 255, 255, 0) 100%
   );
-  animation: ys-shimmer-slide 1.5s infinite cubic-bezier(0.22, 1, 0.36, 1);
+  animation: ys-shimmer-slide 1.5s infinite var(--ease-out);
   will-change: transform;
 }
 
@@ -133,7 +507,7 @@
     rgba(255, 255, 255, 0.09) 50%,
     rgba(255, 255, 255, 0) 100%
   );
-  animation: ys-shimmer-slide 1.5s infinite cubic-bezier(0.22, 1, 0.36, 1);
+  animation: ys-shimmer-slide 1.5s infinite var(--ease-out);
   will-change: transform;
 }
 
@@ -149,7 +523,7 @@
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
 }
 
-/* Thin translucent custom scrollbar for DetailOverlay glass side panel */
+/* Thin translucent custom scrollbar */
 .overlay-panel-scroll {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
@@ -176,4 +550,3 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
-

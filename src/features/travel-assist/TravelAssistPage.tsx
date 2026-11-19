@@ -1,67 +1,41 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowRight,
-  Building2,
-  Bus,
-  Car,
-  Check,
+  ArrowUpDown,
+  Clock,
   Compass,
-  Edit3,
-  Landmark,
+  Crosshair,
+  ExternalLink,
+  IndianRupee,
   Loader2,
+  Map as MapIcon,
   MapPin,
-  Minus,
   Navigation,
-  Plane,
-  Plus,
   Route,
   Search,
   Sparkles,
-  Train,
-  Users,
+  Volume2,
   X,
 } from 'lucide-react';
 import { Navbar } from '../../components/Navbar';
 import { Footer } from '../../components/Footer';
-import { TravelProgressTracker } from '../../components/TravelProgressTracker';
+import { MotionCard } from '../../components/MotionCard';
+import { Reveal, RevealGroup, RevealItem } from '../../components/Reveal';
+import { GoogleRouteMap } from '../../components/GoogleRouteMap';
+import { SafeImage } from '../../components/SafeImage';
+import { IMAGES } from '../../data/destinations';
+import { STAGGER_CARDS_MS } from '../../motion/tokens';
+import type { SharedJourney, SmartHopPlace } from './smartHopTypes';
 import {
-  RideComparisonSection,
-  type CompareResult,
-  VEHICLE_IMAGES,
-} from '../../components/ProviderBadge';
-import { GoogleRouteMap, type MapStop } from '../../components/GoogleRouteMap';
-import {
-  DestinationCarousel,
-  type AttractionCategory,
-  type DiscoveredAttraction,
-} from '../../components/DestinationCarousel';
-import {
-  CinematicDestinationHero,
-  preloadHeroImage,
-  type CinematicHeroShowcase,
-  type HeroFactItem,
-} from '../../components/CinematicDestinationHero';
-import { useDetailOverlay } from '../../components/DetailOverlay';
-import {
-  DiscoverySkeleton,
-  RideCompareSkeleton,
-  SuggestSkeleton,
-} from '../../components/SkeletonCards';
-import { DESTINATIONS, IMAGES } from '../../data/destinations';
-import {
-  INDIA_STATES_AND_UTS,
-  type ArrivalKind,
-} from '../../data/indiaLocations';
-import {
-  readTravelAssistSession,
-  writeTravelAssistSession,
-  type FirstDestKind,
-  type PreferredRideMode,
-  type SelectedPlace,
+  createJourneyId,
+  JOURNEY_TTL_MS,
+  loadSharedJourney,
+  readPlannerDraft,
+  saveSharedJourney,
+  writePlannerDraft,
 } from './travelAssistSession';
-import { useApp } from '../../contexts/AppContext';
 
 interface PlaceSuggestion {
   id: string;
@@ -77,2207 +51,1158 @@ interface PlaceSuggestion {
   source: string;
 }
 
-const ARRIVAL_OPTIONS: Array<{
-  kind: ArrivalKind;
-  apiKind: 'station' | 'bus' | 'airport' | 'all';
-  label: string;
-  placeholder: string;
-}> = [
-  {
-    kind: 'Railway Station',
-    apiKind: 'station',
-    label: 'Railway Station',
-    placeholder: 'Search station name or code (e.g. Puri, LKO, NDLS, JP)',
-  },
-  {
-    kind: 'Bus Stand',
-    apiKind: 'bus',
-    label: 'Bus Stand',
-    placeholder: 'Search bus stand or ISBT (e.g. Puri Bus Stand, Kashmere Gate)',
-  },
-  {
-    kind: 'Airport',
-    apiKind: 'airport',
-    label: 'Airport',
-    placeholder: 'Search airport or IATA code (e.g. Bhubaneswar BBI, Lucknow LKO)',
-  },
-  {
-    kind: 'Other Location',
-    apiKind: 'all',
-    label: 'Other',
-    placeholder: 'Search any city, town, chowk, or address across India',
-  },
+const FROM_CATEGORIES: Array<{ label: string; kind: string }> = [
+  { label: 'All', kind: 'all' },
+  { label: 'Railway Station', kind: 'station' },
+  { label: 'Bus Stand', kind: 'bus' },
+  { label: 'Airport', kind: 'airport' },
+  { label: 'Hotel', kind: 'hotel' },
+  { label: 'Temple', kind: 'temple' },
+  { label: 'Landmark', kind: 'landmark' },
+  { label: 'Market', kind: 'market' },
+  { label: 'Custom Address', kind: 'address' },
 ];
 
-const FIRST_DEST_OPTIONS: Array<{
-  kind: FirstDestKind;
-  apiKind: 'hotel' | 'landmark' | 'address';
-  label: string;
-  placeholder: string;
-  emptyHint: string;
-}> = [
-  {
-    kind: 'Temple / Landmark',
-    apiKind: 'landmark',
-    label: 'Temple / Landmark',
-    placeholder: 'Search temples, forts, beaches, monuments (e.g. Jagannath Temple)',
-    emptyHint: 'Type a temple, palace, fort, beach, or monument (e.g. Jagannath Temple, Bara Imambara).',
-  },
-  {
-    kind: 'Hotel / Stay',
-    apiKind: 'hotel',
-    label: 'Hotel / Stay',
-    placeholder: 'Search hotels, resorts, guesthouses, or homestays...',
-    emptyHint: 'Type a hotel, resort, guesthouse, or lodge name (e.g. Mayfair Waves Puri).',
-  },
-  {
-    kind: 'Custom Address',
-    apiKind: 'address',
-    label: 'Custom Address',
-    placeholder: 'Type any colony, road, ghat, or street address...',
-    emptyHint: 'Type any street address, chowk, colony, or locality in the destination.',
-  },
-  {
-    kind: 'Other Location',
-    apiKind: 'address',
-    label: 'Any Other',
-    placeholder: 'Search any destination point or locality...',
-    emptyHint: 'Type any market, square, campus, or landmark across India.',
-  },
-];
-
-function KindIcon({ kind }: { kind: ArrivalKind }) {
-  if (kind === 'Railway Station') return <Train className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />;
-  if (kind === 'Bus Stand') return <Bus className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />;
-  if (kind === 'Airport') return <Plane className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />;
-  return <MapPin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />;
-}
-
-function DestKindIcon({ kind }: { kind: FirstDestKind }) {
-  if (kind === 'Hotel / Stay') return <Building2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />;
-  if (kind === 'Temple / Landmark') return <Landmark className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />;
-  if (kind === 'Custom Address') return <Navigation className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />;
-  return <MapPin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />;
-}
-
-const CATEGORY_ORDER: AttractionCategory[] = [
-  'Popular Places',
-  'Temples & Heritage',
-  'Nature & Beaches',
-  'Museums & Culture',
-  'Cafe Corner',
-  'Adventure & Experiences',
-  'Hidden Gems',
-];
-
-const CATEGORY_SUBTITLES: Record<AttractionCategory, string> = {
-  'Popular Places': 'Iconic highlights and landmark attractions around this destination',
-  'Temples & Heritage': 'Sacred shrines, historic forts, palaces, and heritage sites',
-  'Nature & Beaches': 'Coastlines, lakes, parks, waterfalls, hills, and scenic spots',
-  'Museums & Culture': 'Museums, craft villages, local arts, and cultural hubs',
-  'Cafe Corner': 'Local coffee spots, bakeries, and relaxed neighbourhood hangouts',
-  'Adventure & Experiences': 'Boating, outdoor trails, sanctuaries, water activities, and scenic drives',
-  'Hidden Gems': 'Regional excursions and quieter escapes worth the ride',
-};
-
-const RIDE_MODE_CARDS: Array<{
-  mode: 'bike' | 'auto' | 'cab';
-  title: string;
-  tagline: string;
-  image: string;
-}> = [
-  {
-    mode: 'bike',
-    title: 'Bike',
-    tagline: 'Quick & budget',
-    image: VEHICLE_IMAGES.bike,
-  },
-  {
-    mode: 'auto',
-    title: 'Auto',
-    tagline: 'City rides',
-    image: VEHICLE_IMAGES.auto,
-  },
-  {
-    mode: 'cab',
-    title: 'Cab',
-    tagline: 'AC & luggage',
-    image: VEHICLE_IMAGES.cab,
-  },
+const TO_CATEGORIES: Array<{ label: string; kind: string }> = [
+  { label: 'All', kind: 'all' },
+  { label: 'Temple', kind: 'temple' },
+  { label: 'Beach', kind: 'beach' },
+  { label: 'Market', kind: 'market' },
+  { label: 'Tourist Attraction', kind: 'attraction' },
+  { label: 'Hotel', kind: 'hotel' },
+  { label: 'Railway Station', kind: 'station' },
+  { label: 'Bus Stand', kind: 'bus' },
+  { label: 'Airport', kind: 'airport' },
+  { label: 'Custom Address', kind: 'address' },
 ];
 
 const QUICK_SAMPLE_ROUTES: Array<{
-  id: string;
-  title: string;
-  state: string;
-  arrivalKind: ArrivalKind;
-  destKind: FirstDestKind;
-  origin: SelectedPlace;
-  dest: SelectedPlace;
+  label: string;
+  origin: SmartHopPlace;
+  destination: SmartHopPlace;
 }> = [
   {
-    id: 'puri-jagannath',
-    title: 'Puri Rail → Jagannath Temple',
-    state: 'Odisha',
-    arrivalKind: 'Railway Station',
-    destKind: 'Temple / Landmark',
+    label: 'Puri Station → Jagannath Temple',
     origin: {
+      id: 'puri-rs',
       label: 'Puri Railway Station (PURI)',
       city: 'Puri',
       state: 'Odisha',
-      lat: 19.8068,
-      lng: 85.8295,
-      groundTip: 'Prepaid auto booth sits outside main Gate 1; Jagannath Temple is ~2 km west.',
+      lat: 19.8077,
+      lng: 85.8394,
+      placeType: 'Railway Station',
       source: 'Indian Transit Index',
     },
-    dest: {
-      label: 'Jagannath Temple, Puri',
+    destination: {
+      id: 'puri-jagannath',
+      label: 'Shri Jagannath Temple',
       city: 'Puri',
       state: 'Odisha',
       lat: 19.8049,
       lng: 85.8179,
+      placeType: 'Heritage Temple',
       source: 'Regional Landmark Directory',
     },
   },
   {
-    id: 'udaipur-palace',
-    title: 'Udaipur Rail → City Palace',
-    state: 'Rajasthan',
-    arrivalKind: 'Railway Station',
-    destKind: 'Temple / Landmark',
+    label: 'Katra Station → Banganga Deodi',
     origin: {
-      label: 'Udaipur City Railway Station (UDZ)',
-      city: 'Udaipur',
-      state: 'Rajasthan',
-      lat: 24.5686,
-      lng: 73.6994,
-      groundTip: 'Prepaid auto booth is outside Gate 1; Old City stays are 2.5–4 km away.',
+      id: 'svdk-rs',
+      label: 'Shri Mata Vaishno Devi Katra Railway Station (SVDK)',
+      city: 'Katra',
+      state: 'Jammu and Kashmir',
+      lat: 32.9813,
+      lng: 74.9498,
+      placeType: 'Railway Station',
       source: 'Indian Transit Index',
     },
-    dest: {
-      label: 'City Palace, Udaipur',
-      city: 'Udaipur',
-      state: 'Rajasthan',
-      lat: 24.5764,
-      lng: 73.6835,
+    destination: {
+      id: 'katra-banganga',
+      label: 'Banganga Darshani Deodi (Vaishno Devi Yatra Gate)',
+      city: 'Katra',
+      state: 'Jammu and Kashmir',
+      lat: 32.9977,
+      lng: 74.9347,
+      placeType: 'Yatra Entrance Gate',
       source: 'Regional Landmark Directory',
     },
   },
   {
-    id: 'lucknow-imambara',
-    title: 'Lucknow Charbagh → Bara Imambara',
-    state: 'Uttar Pradesh',
-    arrivalKind: 'Railway Station',
-    destKind: 'Temple / Landmark',
+    label: 'Varanasi Jn → Kashi Vishwanath',
     origin: {
-      label: 'Lucknow Charbagh Railway Station (LKO)',
-      city: 'Lucknow',
+      id: 'bsb-rs',
+      label: 'Varanasi Junction Railway Station (BSB)',
+      city: 'Varanasi',
       state: 'Uttar Pradesh',
-      lat: 26.8318,
-      lng: 80.9191,
-      groundTip: 'Charbagh Metro station connects directly outside Platform 1 portico.',
+      lat: 25.3267,
+      lng: 82.9862,
+      placeType: 'Railway Station',
       source: 'Indian Transit Index',
     },
-    dest: {
-      label: 'Bara Imambara, Lucknow',
-      city: 'Lucknow',
+    destination: {
+      id: 'vns-kashi',
+      label: 'Kashi Vishwanath Temple',
+      city: 'Varanasi',
       state: 'Uttar Pradesh',
-      lat: 26.8691,
-      lng: 80.9132,
+      lat: 25.3109,
+      lng: 83.0107,
+      placeType: 'Heritage Temple',
+      source: 'Regional Landmark Directory',
+    },
+  },
+  {
+    label: 'Jaipur Jn → Hawa Mahal',
+    origin: {
+      id: 'jp-rs',
+      label: 'Jaipur Junction Railway Station (JP)',
+      city: 'Jaipur',
+      state: 'Rajasthan',
+      lat: 26.9196,
+      lng: 75.7878,
+      placeType: 'Railway Station',
+      source: 'Indian Transit Index',
+    },
+    destination: {
+      id: 'jpr-hawa-mahal',
+      label: 'Hawa Mahal',
+      city: 'Jaipur',
+      state: 'Rajasthan',
+      lat: 26.9239,
+      lng: 75.8267,
+      placeType: 'Heritage Palace',
       source: 'Regional Landmark Directory',
     },
   },
 ];
 
+function suggestionToPlace(s: PlaceSuggestion): SmartHopPlace {
+  return {
+    id: s.id,
+    label: s.label,
+    city: s.city,
+    state: s.state,
+    lat: s.lat,
+    lng: s.lng,
+    placeType: s.placeType,
+    groundTip: s.groundTip,
+    source: s.source,
+  };
+}
+
 export function TravelAssistPage() {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { updateTripContext } = useApp();
-  const { openDetail } = useDetailOverlay();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const journeyIdParam = searchParams.get('j');
 
-  const savedSession = useMemo(() => readTravelAssistSession(), []);
-
-  // Optional State / UT Scope across all 28 States & 8 UTs
-  const [selectedState, setSelectedState] = useState<string>(savedSession?.selectedState || '');
-
-  // Field 1: Starting Point
-  const [arrivalKind, setArrivalKind] = useState<ArrivalKind>(
-    savedSession?.arrivalKind || 'Railway Station'
-  );
-  const [originQuery, setOriginQuery] = useState<string>(savedSession?.originQuery || '');
-  const [originPlace, setOriginPlace] = useState<SelectedPlace | null>(
-    savedSession?.originPlace || null
-  );
+  const [originKind, setOriginKind] = useState<string>('all');
+  const [originQuery, setOriginQuery] = useState<string>('');
+  const [originPlace, setOriginPlace] = useState<SmartHopPlace | null>(null);
   const [originSuggestions, setOriginSuggestions] = useState<PlaceSuggestion[]>([]);
-  const [originOpen, setOriginOpen] = useState<boolean>(false);
-  const [originLoading, setOriginLoading] = useState<boolean>(false);
+  const [originOpen, setOriginOpen] = useState(false);
+  const [originSearching, setOriginSearching] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false);
 
-  // Field 2: First Destination
-  const [destKind, setDestKind] = useState<FirstDestKind>(
-    savedSession?.destKind || 'Temple / Landmark'
-  );
-  const [destQuery, setDestQuery] = useState<string>(savedSession?.destQuery || '');
-  const [destPlace, setDestPlace] = useState<SelectedPlace | null>(savedSession?.destPlace || null);
+  const [destKind, setDestKind] = useState<string>('all');
+  const [destQuery, setDestQuery] = useState<string>('');
+  const [destPlace, setDestPlace] = useState<SmartHopPlace | null>(null);
   const [destSuggestions, setDestSuggestions] = useState<PlaceSuggestion[]>([]);
-  const [destOpen, setDestOpen] = useState<boolean>(false);
-  const [destLoading, setDestLoading] = useState<boolean>(false);
+  const [destOpen, setDestOpen] = useState(false);
+  const [destSearching, setDestSearching] = useState(false);
 
-  // Field 3: Passengers (Clean - 2 + stepper)
-  const [passengers, setPassengers] = useState<number>(savedSession?.passengers || 2);
-
-  // Field 4: Preferred Ride Type ("How would you like to travel?")
-  const [preferredRideType, setPreferredRideType] = useState<PreferredRideMode>(
-    savedSession?.preferredRideType || 'all'
-  );
-
-  // Live Right-Column Ride Comparison & Map States
-  const [formError, setFormError] = useState<string>('');
-  const [findingRide, setFindingRide] = useState<boolean>(false);
-  const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
-  const [compareError, setCompareError] = useState<string>('');
-
-  // Explore All Destinations State
-  const [discoverLoading, setDiscoverLoading] = useState<boolean>(false);
-  const [discoverError, setDiscoverError] = useState<string>('');
-  const [attractions, setAttractions] = useState<DiscoveredAttraction[]>([]);
-  const [regionInfo, setRegionInfo] = useState<{
-    city: string;
-    state: string;
-    lat: number;
-    lng: number;
+  const [swappedCount, setSwappedCount] = useState(0);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [plannerError, setPlannerError] = useState<string | null>(null);
+  const [sharedJourney, setSharedJourney] = useState<SharedJourney | null>(null);
+  const [showRouteMap, setShowRouteMap] = useState(false);
+  const [popupFallback, setPopupFallback] = useState<{
+    cardId: 'fare' | 'timing' | 'pitstops';
+    url: string;
   } | null>(null);
-  const [attractionSearch, setAttractionSearch] = useState<string>('');
-  const [activeCategoryFilter, setActiveCategoryFilter] = useState<'All' | AttractionCategory>('All');
-  const [visibleGridLimit, setVisibleGridLimit] = useState<number>(12);
-  const [exploringSectionActive, setExploringSectionActive] = useState<boolean>(false);
-  const [selectedHeroAttraction, setSelectedHeroAttraction] = useState<DiscoveredAttraction | null>(null);
-  const [autoSlideIndex, setAutoSlideIndex] = useState<number>(() => {
-    const qDest = searchParams.get('dest');
-    if (qDest) {
-      const idx = DESTINATIONS.findIndex((d) => d.id.toLowerCase() === qDest.toLowerCase());
-      if (idx >= 0) return idx;
-    }
-    return 0;
-  });
-  const [isPageHidden, setIsPageHidden] = useState<boolean>(() =>
-    typeof document !== 'undefined' ? document.hidden : false
-  );
 
-  // Editable Pickup Point for Explore All Destinations distances & attraction comparison links
-  const [pickupPlace, setPickupPlace] = useState<SelectedPlace | null>(
-    savedSession?.pickupPlace || savedSession?.destPlace || null
-  );
-  const [editingPickup, setEditingPickup] = useState<boolean>(false);
-  const [pickupQuery, setPickupQuery] = useState<string>(
-    savedSession?.pickupPlace?.label || savedSession?.destPlace?.label || ''
-  );
-  const [pickupSuggestions, setPickupSuggestions] = useState<PlaceSuggestion[]>([]);
-  const [pickupOpen, setPickupOpen] = useState<boolean>(false);
-  const [pickupLoading, setPickupLoading] = useState<boolean>(false);
+  const originWrapRef = useRef<HTMLDivElement>(null);
+  const destWrapRef = useRef<HTMLDivElement>(null);
+  const plannerSectionRef = useRef<HTMLElement>(null);
 
-  const originWrapRef = useRef<HTMLDivElement | null>(null);
-  const destWrapRef = useRef<HTMLDivElement | null>(null);
-  const pickupWrapRef = useRef<HTMLDivElement | null>(null);
-  const heroSectionRef = useRef<HTMLElement | null>(null);
-  const workspaceRef = useRef<HTMLElement | null>(null);
-  const exploreSectionRef = useRef<HTMLElement | null>(null);
-  const initialHydratedRef = useRef<boolean>(false);
-
-  const currentOriginMeta =
-    ARRIVAL_OPTIONS.find((o) => o.kind === arrivalKind) || ARRIVAL_OPTIONS[0];
-  const currentDestMeta =
-    FIRST_DEST_OPTIONS.find((o) => o.kind === destKind) || FIRST_DEST_OPTIONS[0];
-
-  // Close dropdowns when clicking outside
+  // Hydrate existing shared journey (if returning via ?j=<id> or recent valid journey in localStorage)
   useEffect(() => {
-    const handleDocClick = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (originWrapRef.current && !originWrapRef.current.contains(target)) {
+    const loaded = loadSharedJourney(journeyIdParam);
+    if (loaded.journey) {
+      setSharedJourney(loaded.journey);
+      setOriginPlace(loaded.journey.origin);
+      setOriginQuery(loaded.journey.origin.label);
+      setDestPlace(loaded.journey.destination);
+      setDestQuery(loaded.journey.destination.label);
+      return;
+    }
+
+    const draft = readPlannerDraft();
+    if (draft) {
+      if (draft.originCategory) setOriginKind(draft.originCategory);
+      if (draft.originQuery) setOriginQuery(draft.originQuery);
+      if (draft.originPlace) setOriginPlace(draft.originPlace);
+      if (draft.destCategory) setDestKind(draft.destCategory);
+      if (draft.destQuery) setDestQuery(draft.destQuery);
+      if (draft.destPlace) setDestPlace(draft.destPlace);
+    }
+  }, [journeyIdParam]);
+
+  // Persist planner draft locally
+  useEffect(() => {
+    writePlannerDraft({
+      originCategory: originKind,
+      originQuery,
+      originPlace,
+      destCategory: destKind,
+      destQuery,
+      destPlace,
+    });
+  }, [originKind, originQuery, originPlace, destKind, destQuery, destPlace]);
+
+  // Close autocomplete popovers on outside click
+  useEffect(() => {
+    const onPointerDown = (e: MouseEvent) => {
+      if (originWrapRef.current && !originWrapRef.current.contains(e.target as Node)) {
         setOriginOpen(false);
       }
-      if (destWrapRef.current && !destWrapRef.current.contains(target)) {
+      if (destWrapRef.current && !destWrapRef.current.contains(e.target as Node)) {
         setDestOpen(false);
       }
-      if (pickupWrapRef.current && !pickupWrapRef.current.contains(target)) {
-        setPickupOpen(false);
-      }
     };
-    document.addEventListener('mousedown', handleDocClick);
-    return () => document.removeEventListener('mousedown', handleDocClick);
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
   }, []);
 
-  // Optional URL deep-link (?state=Odisha or ?dest=jaipur)
-  useEffect(() => {
-    const qState = searchParams.get('state');
-    if (qState) {
-      const matchedState = INDIA_STATES_AND_UTS.find(
-        (s) => s.name.toLowerCase() === qState.toLowerCase() || s.code.toLowerCase() === qState.toLowerCase()
-      );
-      if (matchedState) setSelectedState(matchedState.name);
-    }
-    const qDest = searchParams.get('dest');
-    if (qDest) {
-      const idx = DESTINATIONS.findIndex((d) => d.id.toLowerCase() === qDest.toLowerCase());
-      if (idx >= 0) setAutoSlideIndex(idx);
-    }
-  }, [searchParams]);
-
-  // Auto-cycle hero destination every 6 seconds when no user route is active; pause on hidden tab
-  const autoCycleActive = !selectedHeroAttraction && !regionInfo && !destPlace;
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const handleVisibility = () => setIsPageHidden(document.hidden);
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, []);
-
-  useEffect(() => {
-    if (!autoCycleActive || DESTINATIONS.length < 2) return;
-    const nextIdx = (autoSlideIndex + 1) % DESTINATIONS.length;
-    preloadHeroImage(DESTINATIONS[nextIdx]?.heroImage);
-
-    if (isPageHidden) return;
-    const timer = window.setInterval(() => {
-      setAutoSlideIndex((prev) => (prev + 1) % DESTINATIONS.length);
-    }, 6000);
-    return () => window.clearInterval(timer);
-  }, [autoCycleActive, autoSlideIndex, isPageHidden]);
-
-  // Live OSRM Ride Comparison API caller
-  const runLiveCompare = useCallback(
+  const fetchSuggestions = useCallback(
     async (
-      origin: SelectedPlace,
-      dest: SelectedPlace,
-      paxCount: number,
-      stateScope: string
-    ) => {
-      setFindingRide(true);
-      setCompareError('');
-      try {
-        const res = await fetch('/api/travel-assist/compare', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            originLat: origin.lat,
-            originLng: origin.lng,
-            originLabel: origin.label,
-            destLat: dest.lat,
-            destLng: dest.lng,
-            destLabel: dest.label,
-            passengers: paxCount,
-            cityName: dest.city || origin.city || '',
-            stateName: dest.state || origin.state || stateScope || '',
-          }),
-        });
-        const data = (await res.json().catch(() => ({}))) as CompareResult & { error?: string };
-        if (!res.ok || data.routeAvailable === false) {
-          throw new Error(
-            data.error ||
-              'OSRM road routing is temporarily unreachable for this route. Please retry.'
-          );
-        }
-        setCompareResult(data);
-      } catch (err) {
-        setCompareResult(null);
-        setCompareError(
-          err instanceof Error
-            ? err.message
-            : 'Unable to calculate OSRM road route and fares right now.'
-        );
-      } finally {
-        setFindingRide(false);
+      query: string,
+      kind: string,
+      biasPlace: SmartHopPlace | null,
+      signal: AbortSignal
+    ): Promise<PlaceSuggestion[]> => {
+      const params = new URLSearchParams();
+      if (query.trim()) params.set('q', query.trim());
+      params.set('kind', kind || 'all');
+      if (biasPlace) {
+        params.set('biasLat', String(biasPlace.lat));
+        params.set('biasLng', String(biasPlace.lng));
+        if (biasPlace.state) params.set('state', biasPlace.state);
       }
+      const res = await fetch(`/api/places/suggest?${params.toString()}`, { signal });
+      if (!res.ok) return [];
+      const data = (await res.json()) as { suggestions?: PlaceSuggestion[] };
+      return Array.isArray(data.suggestions) ? data.suggestions : [];
     },
     []
   );
 
-  // Discover all regional attractions around destination
-  const fetchRegionalDiscovery = useCallback(
-    async (centerPlace: SelectedPlace, currentPickup: SelectedPlace) => {
-      setDiscoverLoading(true);
-      setDiscoverError('');
-      try {
-        const params = new URLSearchParams({
-          city: centerPlace.city || currentPickup.city || '',
-          state: centerPlace.state || currentPickup.state || selectedState || '',
-          lat: String(centerPlace.lat),
-          lng: String(centerPlace.lng),
-          pickupLat: String(currentPickup.lat),
-          pickupLng: String(currentPickup.lng),
-        });
-        const res = await fetch(`/api/travel-assist/discover?${params.toString()}`);
-        if (!res.ok) {
-          throw new Error('Could not load local attractions right now.');
-        }
-        const data = (await res.json()) as {
-          region: { city: string; state: string; lat: number; lng: number };
-          attractions: DiscoveredAttraction[];
-        };
-        setRegionInfo(data.region);
-        setAttractions(data.attractions || []);
-      } catch (err) {
-        setDiscoverError(
-          err instanceof Error ? err.message : 'Unable to discover regional destinations right now.'
-        );
-      } finally {
-        setDiscoverLoading(false);
-      }
-    },
-    [selectedState]
-  );
-
-  // Hydrate BOTH right-column OSRM comparison and lower Explore All Destinations when returning from /travel-assist/compare
-  useEffect(() => {
-    if (initialHydratedRef.current) return;
-    if (savedSession?.destPlace && savedSession?.originPlace) {
-      initialHydratedRef.current = true;
-      const activePickup = savedSession.pickupPlace || savedSession.destPlace;
-      runLiveCompare(
-        savedSession.originPlace,
-        savedSession.destPlace,
-        savedSession.passengers || 2,
-        savedSession.selectedState || ''
-      );
-      fetchRegionalDiscovery(savedSession.destPlace, activePickup);
-    }
-  }, [savedSession, runLiveCompare, fetchRegionalDiscovery]);
-
-  // Smooth scroll to #explore-destinations when linked back from CompareRidesPage
-  useEffect(() => {
-    if (location.hash === '#explore-destinations' && exploreSectionRef.current) {
-      setExploringSectionActive(true);
-      setTimeout(() => {
-        exploreSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 150);
-    }
-  }, [location.hash, attractions.length]);
-
-  // Fetch Starting Point suggestions strictly filtered by arrivalKind (station | bus | airport | all)
+  // Live FROM autocomplete
   useEffect(() => {
     if (!originOpen) return;
     const ctrl = new AbortController();
     const timer = setTimeout(async () => {
-      setOriginLoading(true);
+      setOriginSearching(true);
       try {
-        const params = new URLSearchParams({
-          q: originQuery.trim(),
-          kind: currentOriginMeta.apiKind,
-        });
-        if (selectedState) params.set('state', selectedState);
-        const res = await fetch(`/api/places/suggest?${params.toString()}`, {
-          signal: ctrl.signal,
-        });
-        if (res.ok) {
-          const json = (await res.json()) as { suggestions?: PlaceSuggestion[] };
-          setOriginSuggestions(json.suggestions || []);
-        }
+        const list = await fetchSuggestions(originQuery, originKind, destPlace, ctrl.signal);
+        setOriginSuggestions(list);
       } catch {
-        // Ignore aborted fetch
+        // Ignore aborted fetches
       } finally {
-        setOriginLoading(false);
+        setOriginSearching(false);
       }
-    }, originQuery.trim().length < 2 ? 50 : 220);
-
+    }, 200);
     return () => {
-      ctrl.abort();
       clearTimeout(timer);
+      ctrl.abort();
     };
-  }, [originQuery, currentOriginMeta.apiKind, selectedState, originOpen]);
+  }, [originQuery, originKind, originOpen, destPlace, fetchSuggestions]);
 
-  // Fetch First Destination suggestions strictly filtered by destKind (hotel | landmark | address)
+  // Live TO autocomplete
   useEffect(() => {
     if (!destOpen) return;
     const ctrl = new AbortController();
     const timer = setTimeout(async () => {
-      setDestLoading(true);
+      setDestSearching(true);
       try {
-        const params = new URLSearchParams({
-          q: destQuery.trim(),
-          kind: currentDestMeta.apiKind,
-        });
-        const activeState = originPlace?.state || selectedState;
-        if (activeState) params.set('state', activeState);
-        if (originPlace) {
-          params.set('biasLat', String(originPlace.lat));
-          params.set('biasLng', String(originPlace.lng));
-        }
-        const res = await fetch(`/api/places/suggest?${params.toString()}`, {
-          signal: ctrl.signal,
-        });
-        if (res.ok) {
-          const json = (await res.json()) as { suggestions?: PlaceSuggestion[] };
-          setDestSuggestions(json.suggestions || []);
-        }
+        const list = await fetchSuggestions(destQuery, destKind, originPlace, ctrl.signal);
+        setDestSuggestions(list);
       } catch {
-        // Ignore abort
+        // Ignore aborted fetches
       } finally {
-        setDestLoading(false);
+        setDestSearching(false);
       }
-    }, destQuery.trim().length < 2 ? 60 : 220);
-
+    }, 200);
     return () => {
-      ctrl.abort();
       clearTimeout(timer);
-    };
-  }, [destQuery, currentDestMeta.apiKind, originPlace, selectedState, destOpen]);
-
-  // Fetch Editable Pickup suggestions
-  useEffect(() => {
-    if (!pickupOpen || !editingPickup) return;
-    const ctrl = new AbortController();
-    const timer = setTimeout(async () => {
-      setPickupLoading(true);
-      try {
-        const params = new URLSearchParams({
-          q: pickupQuery.trim(),
-          kind: 'address',
-        });
-        const activeState = regionInfo?.state || originPlace?.state || selectedState;
-        if (activeState) params.set('state', activeState);
-        if (regionInfo) {
-          params.set('biasLat', String(regionInfo.lat));
-          params.set('biasLng', String(regionInfo.lng));
-        }
-        const res = await fetch(`/api/places/suggest?${params.toString()}`, {
-          signal: ctrl.signal,
-        });
-        if (res.ok) {
-          const json = (await res.json()) as { suggestions?: PlaceSuggestion[] };
-          setPickupSuggestions(json.suggestions || []);
-        }
-      } catch {
-        // Ignore abort
-      } finally {
-        setPickupLoading(false);
-      }
-    }, pickupQuery.trim().length < 2 ? 60 : 220);
-
-    return () => {
       ctrl.abort();
-      clearTimeout(timer);
     };
-  }, [pickupQuery, pickupOpen, editingPickup, regionInfo, originPlace, selectedState]);
+  }, [destQuery, destKind, destOpen, originPlace, fetchSuggestions]);
 
-  // Resolve free-text / manual custom entry cleanly
-  const resolveCustomTextPlace = useCallback(
-    async (
-      rawText: string,
-      kind: 'station' | 'bus' | 'airport' | 'hotel' | 'landmark' | 'address' | 'all',
-      anchor?: SelectedPlace | null
-    ): Promise<SelectedPlace | null> => {
-      const cleaned = rawText.trim();
-      if (!cleaned) return null;
+  const handleUseCurrentLocation = () => {
+    setPlannerError(null);
+    if (!navigator.geolocation) {
+      setPlannerError('Browser location is not supported on this device. Please select a starting place from the suggestions.');
+      return;
+    }
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        let resolvedLabel = `Current Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+        let resolvedCity = '';
+        let resolvedState = '';
 
-      const queriesToTry = [cleaned];
-      if (cleaned.includes(',')) {
-        const tail = cleaned.split(',').slice(1).join(',').trim();
-        if (tail.length >= 2) queriesToTry.push(tail);
-      }
-
-      for (const candidateQ of queriesToTry) {
         try {
-          const params = new URLSearchParams({ q: candidateQ, kind });
-          const st = anchor?.state || selectedState;
-          if (st) params.set('state', st);
-          if (anchor) {
-            params.set('biasLat', String(anchor.lat));
-            params.set('biasLng', String(anchor.lng));
-          }
-          const res = await fetch(`/api/places/suggest?${params.toString()}`);
-          if (res.ok) {
-            const data = (await res.json()) as { suggestions?: PlaceSuggestion[] };
-            const hit = data.suggestions?.[0];
-            if (hit) {
-              return {
-                label: cleaned,
-                city: hit.city || anchor?.city || '',
-                state: hit.state || anchor?.state || selectedState || '',
-                lat: candidateQ === cleaned ? hit.lat : Number((hit.lat + 0.011).toFixed(5)),
-                lng: candidateQ === cleaned ? hit.lng : Number((hit.lng + 0.013).toFixed(5)),
-                groundTip: hit.groundTip,
-                source: candidateQ === cleaned ? hit.source : 'Custom Address (City Anchored)',
-              };
-            }
+          const ctrl = new AbortController();
+          const nearby = await fetchSuggestions('', 'all', {
+            label: resolvedLabel,
+            city: '',
+            state: '',
+            lat,
+            lng,
+          }, ctrl.signal);
+          if (nearby.length > 0) {
+            resolvedCity = nearby[0].city;
+            resolvedState = nearby[0].state;
+            resolvedLabel = `Current Location · Near ${nearby[0].city || nearby[0].label}`;
           }
         } catch {
-          // Try next fallback
+          // Keep coordinate label cleanly
         }
-      }
 
-      if (anchor) {
-        return {
-          label: cleaned,
-          city: anchor.city,
-          state: anchor.state,
-          lat: Number((anchor.lat + 0.014).toFixed(5)),
-          lng: Number((anchor.lng + 0.016).toFixed(5)),
-          source: 'Custom Local Address',
+        const gpsPlace: SmartHopPlace = {
+          id: 'current-gps',
+          label: resolvedLabel,
+          city: resolvedCity,
+          state: resolvedState,
+          lat,
+          lng,
+          placeType: 'Current Location',
+          source: 'Device GPS',
         };
-      }
-
-      const stObj = INDIA_STATES_AND_UTS.find((s) => s.name === selectedState);
-      if (stObj) {
-        return {
-          label: cleaned,
-          city: stObj.capital,
-          state: stObj.name,
-          lat: stObj.lat,
-          lng: stObj.lng,
-          source: `${stObj.name} Regional Anchor`,
-        };
-      }
-
-      return null;
-    },
-    [selectedState]
-  );
-
-  // Execute search for an explicit origin + destination pair (used by both Submit & Sample triggers)
-  const executeJourneySearch = useCallback(
-    async (
-      resolvedOrigin: SelectedPlace,
-      resolvedDest: SelectedPlace,
-      paxCount: number,
-      prefMode: PreferredRideMode,
-      kindArrival: ArrivalKind,
-      kindDest: FirstDestKind
-    ) => {
-      setOriginPlace(resolvedOrigin);
-      setDestPlace(resolvedDest);
-      setPickupPlace(resolvedDest);
-      setPickupQuery(resolvedDest.label);
-      setExploringSectionActive(false);
-      setSelectedHeroAttraction(null);
-
-      const city = resolvedDest.city || resolvedOrigin.city;
-      const state = resolvedDest.state || resolvedOrigin.state || selectedState;
-
-      writeTravelAssistSession({
-        selectedState: state,
-        arrivalKind: kindArrival,
-        originQuery: resolvedOrigin.label,
-        originPlace: resolvedOrigin,
-        destKind: kindDest,
-        destQuery: resolvedDest.label,
-        destPlace: resolvedDest,
-        pickupPlace: resolvedDest,
-        passengers: paxCount,
-        preferredRideType: prefMode,
-      });
-
-      updateTripContext({
-        pickupLabel: resolvedOrigin.label,
-        pickupCoords: { lat: resolvedOrigin.lat, lng: resolvedOrigin.lng },
-        passengers: paxCount,
-      });
-
-      await Promise.all([
-        runLiveCompare(resolvedOrigin, resolvedDest, paxCount, state),
-        fetchRegionalDiscovery(resolvedDest, resolvedDest),
-      ]);
-    },
-    [selectedState, updateTripContext, runLiveCompare, fetchRegionalDiscovery]
-  );
-
-  // Submit main Arrival Form -> Computes live OSRM route + provider fares right in the Right Column AND discovers destinations below
-  const handleFindMyRide = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError('');
-
-    if (!originQuery.trim()) {
-      setFormError('Please enter or select where you are arriving (station, bus stand, airport, or city).');
-      return;
-    }
-    if (!destQuery.trim()) {
-      setFormError('Please enter where you want to go first (temple, landmark, hotel, or address).');
-      return;
-    }
-
-    setFindingRide(true);
-    try {
-      const resolvedOrigin =
-        originPlace && originPlace.label === originQuery.trim()
-          ? originPlace
-          : await resolveCustomTextPlace(originQuery, currentOriginMeta.apiKind, null);
-
-      if (!resolvedOrigin) {
-        setFormError(
-          'Could not locate that starting point in India. Try choosing a suggestion or selecting the State/UT first.'
+        setOriginPlace(gpsPlace);
+        setOriginQuery(gpsPlace.label);
+        setOriginOpen(false);
+        setGpsLoading(false);
+      },
+      (err) => {
+        setGpsLoading(false);
+        setPlannerError(
+          err.code === err.PERMISSION_DENIED
+            ? 'Location permission was declined. Please choose a starting station, stand, or landmark from the dropdown.'
+            : 'Could not read your GPS coordinates right now. Please select a place from the suggestions.'
         );
-        setFindingRide(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
+  const handleSwap = () => {
+    setSwappedCount((c) => c + 1);
+    const prevOriginPlace = originPlace;
+    const prevOriginQuery = originQuery;
+    setOriginPlace(destPlace);
+    setOriginQuery(destQuery);
+    setDestPlace(prevOriginPlace);
+    setDestQuery(prevOriginQuery);
+    setPlannerError(null);
+  };
+
+  const runRouteCalculation = async (resolvedOrigin: SmartHopPlace, resolvedDest: SmartHopPlace) => {
+    setRouteLoading(true);
+    setPlannerError(null);
+    setPopupFallback(null);
+
+    try {
+      const res = await fetch('/api/smart-hop/route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origin: resolvedOrigin,
+          destination: resolvedDest,
+        }),
+      });
+      const data = (await res.json()) as {
+        routeAvailable?: boolean;
+        error?: string;
+        origin?: SmartHopPlace;
+        destination?: SmartHopPlace;
+        city?: string;
+        state?: string;
+        distanceKm?: number;
+        durationMinutes?: number;
+        trafficAwareDurationMinutes?: number | null;
+        isTrafficAware?: boolean;
+        routeSource?: string;
+        trafficSourceLabel?: string;
+        routeGeometry?: Array<{ lat: number; lng: number }>;
+        routeTimestamp?: string;
+      };
+
+      if (!res.ok || !data.routeAvailable || typeof data.distanceKm !== 'number' || typeof data.durationMinutes !== 'number') {
+        setPlannerError(
+          data.error ||
+            'Road routing is currently unavailable for these points. No distance or fare has been guessed.'
+        );
         return;
       }
 
-      const resolvedDest =
-        destPlace && destPlace.label === destQuery.trim()
-          ? destPlace
-          : await resolveCustomTextPlace(destQuery, currentDestMeta.apiKind, resolvedOrigin);
+      const now = Date.now();
+      const journey: SharedJourney = {
+        journeyId: createJourneyId(),
+        origin: { ...resolvedOrigin, ...(data.origin || {}) },
+        destination: { ...resolvedDest, ...(data.destination || {}) },
+        city: data.city || resolvedDest.city || resolvedOrigin.city || '',
+        state: data.state || resolvedDest.state || resolvedOrigin.state || '',
+        distanceKm: data.distanceKm,
+        durationMinutes: data.durationMinutes,
+        trafficAwareDurationMinutes: data.trafficAwareDurationMinutes ?? null,
+        isTrafficAware: Boolean(data.isTrafficAware),
+        routeSource: data.routeSource || 'OSRM Road Routing',
+        trafficSourceLabel:
+          data.trafficSourceLabel || 'Route estimate without live traffic data',
+        routeGeometry: Array.isArray(data.routeGeometry) ? data.routeGeometry : [],
+        routeTimestamp: data.routeTimestamp || new Date(now).toISOString(),
+        createdAt: now,
+        expiresAt: now + JOURNEY_TTL_MS,
+      };
 
-      if (!resolvedDest) {
-        setFormError('Could not locate your first destination. Try choosing a suggestion or including the city name.');
-        setFindingRide(false);
-        return;
-      }
-
-      await executeJourneySearch(
-        resolvedOrigin,
-        resolvedDest,
-        passengers,
-        preferredRideType,
-        arrivalKind,
-        destKind
+      saveSharedJourney(journey);
+      setSharedJourney(journey);
+      setSearchParams({ j: journey.journeyId }, { replace: true });
+    } catch {
+      setPlannerError(
+        'Unable to reach the routing service right now. Please check your connection and try again.'
       );
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Unable to prepare ride comparison right now.');
-      setFindingRide(false);
+    } finally {
+      setRouteLoading(false);
     }
   };
 
-  // One-click real OSRM sample trigger
-  const handleLoadSample = async (sample: (typeof QUICK_SAMPLE_ROUTES)[number]) => {
-    setFormError('');
-    setSelectedState(sample.state);
-    setArrivalKind(sample.arrivalKind);
-    setDestKind(sample.destKind);
+  const resolveTypedPlaceFromApi = async (
+    query: string,
+    kind: string,
+    biasPlace: SmartHopPlace | null
+  ): Promise<SmartHopPlace | null> => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) return null;
+    try {
+      const ctrl = new AbortController();
+      const matches = await fetchSuggestions(trimmed, kind, biasPlace, ctrl.signal);
+      if (matches.length === 0) return null;
+      return suggestionToPlace(matches[0]);
+    } catch {
+      return null;
+    }
+  };
+
+  const handleExploreJourney = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPlannerError(null);
+
+    let activeOrigin = originPlace;
+    let activeDest = destPlace;
+
+    if (!activeOrigin && originQuery.trim()) {
+      const foundOrigin = await resolveTypedPlaceFromApi(originQuery, originKind, activeDest);
+      if (foundOrigin) {
+        activeOrigin = foundOrigin;
+        setOriginPlace(foundOrigin);
+        setOriginQuery(foundOrigin.label);
+      }
+    }
+
+    if (!activeDest && destQuery.trim()) {
+      const foundDest = await resolveTypedPlaceFromApi(destQuery, destKind, activeOrigin);
+      if (foundDest) {
+        activeDest = foundDest;
+        setDestPlace(foundDest);
+        setDestQuery(foundDest.label);
+      }
+    }
+
+    if (!activeOrigin) {
+      setPlannerError(
+        originQuery.trim()
+          ? `Could not resolve "${originQuery.trim()}" to real coordinates. Choose a suggestion from the FROM dropdown or use Current Location.`
+          : 'Please choose your FROM starting point from the suggestions or use Current Location.'
+      );
+      return;
+    }
+
+    if (!activeDest) {
+      setPlannerError(
+        destQuery.trim()
+          ? `Could not resolve "${destQuery.trim()}" to real coordinates. Choose a suggestion from the TO dropdown or enter a clearer landmark/city.`
+          : 'Please choose your TO destination from the suggestions.'
+      );
+      return;
+    }
+
+    await runRouteCalculation(activeOrigin, activeDest);
+  };
+
+  const handleSelectQuickSample = async (sample: (typeof QUICK_SAMPLE_ROUTES)[number]) => {
+    setOriginPlace(sample.origin);
     setOriginQuery(sample.origin.label);
-    setDestQuery(sample.dest.label);
+    setDestPlace(sample.destination);
+    setDestQuery(sample.destination.label);
     setOriginOpen(false);
     setDestOpen(false);
-    await executeJourneySearch(
-      sample.origin,
-      sample.dest,
-      passengers,
-      preferredRideType,
-      sample.arrivalKind,
-      sample.destKind
-    );
+    await runRouteCalculation(sample.origin, sample.destination);
   };
 
-  // Live passenger stepper update -> updates session & refreshes OSRM comparison in place if already loaded
-  const handleStepPassengers = (delta: number) => {
-    const nextCount = Math.max(1, Math.min(6, passengers + delta));
-    if (nextCount === passengers) return;
-    setPassengers(nextCount);
-    if (originPlace && destPlace && compareResult) {
-      writeTravelAssistSession({
-        selectedState,
-        arrivalKind,
-        originQuery: originPlace.label,
-        originPlace,
-        destKind,
-        destQuery: destPlace.label,
-        destPlace,
-        pickupPlace: pickupPlace || destPlace,
-        passengers: nextCount,
-        preferredRideType,
-      });
-      runLiveCompare(
-        originPlace,
-        destPlace,
-        nextCount,
-        destPlace.state || originPlace.state || selectedState
+  const handleOpenFeatureTab = (cardId: 'fare' | 'timing' | 'pitstops') => {
+    if (!sharedJourney) {
+      setPlannerError(
+        'First choose your FROM and TO places above and click "Explore Journey" so all three tools share your route.'
       );
+      plannerSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    // Re-persist to guarantee fresh cross-tab localStorage payload
+    saveSharedJourney(sharedJourney);
+    const targetUrl = `/travel-assist/${cardId}?j=${encodeURIComponent(sharedJourney.journeyId)}`;
+    const opened = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    if (!opened || opened.closed || typeof opened.closed === 'undefined') {
+      setPopupFallback({ cardId, url: targetUrl });
+    } else {
+      setPopupFallback(null);
     }
   };
 
-  // Build deep-link URL to full dedicated /travel-assist/compare page
-  const fullCompareHref = useMemo(() => {
-    if (!originPlace || !destPlace) return '/travel-assist/compare';
-    const params = new URLSearchParams({
-      mode: 'arrival',
-      oLabel: originPlace.label,
-      oLat: String(originPlace.lat),
-      oLng: String(originPlace.lng),
-      dLabel: destPlace.label,
-      dLat: String(destPlace.lat),
-      dLng: String(destPlace.lng),
-      pax: String(passengers),
-      pref: preferredRideType,
-      city: destPlace.city || originPlace.city || '',
-      state: destPlace.state || originPlace.state || selectedState || '',
-    });
-    if (originPlace.groundTip) params.set('groundTip', originPlace.groundTip);
-    return `/travel-assist/compare?${params.toString()}`;
-  }, [originPlace, destPlace, passengers, preferredRideType, selectedState]);
+  const activeDuration =
+    sharedJourney?.trafficAwareDurationMinutes ?? sharedJourney?.durationMinutes ?? null;
 
-  // Navigate to dedicated /travel-assist/compare for a selected attraction
-  const handleSelectAttraction = (attraction: DiscoveredAttraction) => {
-    const activePickup = pickupPlace || destPlace || originPlace;
-    if (!activePickup) return;
-
-    if (originPlace && destPlace) {
-      writeTravelAssistSession({
-        selectedState,
-        arrivalKind,
-        originQuery: originPlace.label,
-        originPlace,
-        destKind,
-        destQuery: destPlace.label,
-        destPlace,
-        pickupPlace: activePickup,
-        passengers,
-        preferredRideType,
-      });
-    }
-
-    const params = new URLSearchParams({
-      mode: 'attraction',
-      oLabel: activePickup.label,
-      oLat: String(activePickup.lat),
-      oLng: String(activePickup.lng),
-      dLabel: attraction.name,
-      dLat: String(attraction.lat),
-      dLng: String(attraction.lng),
-      pax: String(passengers),
-      pref: preferredRideType,
-      city: regionInfo?.city || activePickup.city || '',
-      state: regionInfo?.state || activePickup.state || selectedState || '',
-      attrCategory: attraction.category,
-      attrDesc: attraction.shortDescription,
-      attrTime: attraction.bestVisitingTime,
-    });
-
-    navigate(`/travel-assist/compare?${params.toString()}`);
-  };
-
-  // Update editable pickup and recalculate Explore All Destinations distances
-  const handleApplyNewPickup = async (newPickup: SelectedPlace) => {
-    setPickupPlace(newPickup);
-    setPickupQuery(newPickup.label);
-    setEditingPickup(false);
-    setPickupOpen(false);
-
-    if (originPlace && destPlace) {
-      writeTravelAssistSession({
-        selectedState,
-        arrivalKind,
-        originQuery: originPlace.label,
-        originPlace,
-        destKind,
-        destQuery: destPlace.label,
-        destPlace,
-        pickupPlace: newPickup,
-        passengers,
-        preferredRideType,
-      });
-    }
-
-    if (regionInfo) {
-      await fetchRegionalDiscovery(
-        {
-          label: regionInfo.city,
-          city: regionInfo.city,
-          state: regionInfo.state,
-          lat: regionInfo.lat,
-          lng: regionInfo.lng,
-          source: 'Region',
-        },
-        newPickup
-      );
-    }
-  };
-
-  // Filtered attractions & grouped carousels
-  const filteredAttractions = useMemo(() => {
-    const q = attractionSearch.trim().toLowerCase();
-    return attractions.filter((item) => {
-      if (activeCategoryFilter !== 'All' && item.category !== activeCategoryFilter) {
-        return false;
-      }
-      if (!q) return true;
-      return (
-        item.name.toLowerCase().includes(q) ||
-        item.location.toLowerCase().includes(q) ||
-        item.shortDescription.toLowerCase().includes(q) ||
-        item.category.toLowerCase().includes(q)
-      );
-    });
-  }, [attractions, activeCategoryFilter, attractionSearch]);
-
-  const groupedCarousels = useMemo(() => {
-    const groups: Record<AttractionCategory, DiscoveredAttraction[]> = {
-      'Popular Places': [],
-      'Temples & Heritage': [],
-      'Nature & Beaches': [],
-      'Museums & Culture': [],
-      'Cafe Corner': [],
-      'Adventure & Experiences': [],
-      'Hidden Gems': [],
-    };
-
-    // Popular Places only promotes genuine sightseeing landmarks/monuments/nature/museums (not random cafes)
-    const popularEligible = filteredAttractions.filter(
-      (item) => item.category !== 'Cafe Corner'
-    );
-    const popularTop = popularEligible.slice(0, 8);
-    if (activeCategoryFilter === 'All' || activeCategoryFilter === 'Popular Places') {
-      groups['Popular Places'] = popularTop;
-    }
-
-    for (const item of filteredAttractions) {
-      if (item.category !== 'Popular Places') {
-        groups[item.category].push(item);
-      } else if (activeCategoryFilter === 'Popular Places' && !popularTop.some((p) => p.id === item.id)) {
-        groups['Popular Places'].push(item);
-      }
-    }
-    return groups;
-  }, [filteredAttractions, activeCategoryFilter]);
-
-  const mapStops: MapStop[] = useMemo(() => {
-    if (!compareResult) return [];
-    return [
-      {
-        id: 'ta-origin',
-        label: compareResult.route.originLabel,
-        lat: compareResult.route.origin.lat,
-        lng: compareResult.route.origin.lng,
-        kind: 'origin',
-      },
-      {
-        id: 'ta-dest',
-        label: compareResult.route.destLabel,
-        lat: compareResult.route.destination.lat,
-        lng: compareResult.route.destination.lng,
-        kind: 'destination',
-      },
-    ];
-  }, [compareResult]);
-
-  const activeStage: 1 | 2 | 3 | 4 = exploringSectionActive
-    ? 3
-    : compareResult
-    ? 2
-    : attractions.length > 0
-    ? 3
-    : 1;
-
-  const destinationCityHeading =
-    regionInfo?.city || destPlace?.city || originPlace?.city || 'Your Region';
-
-  const handlePreviewAttractionInHero = useCallback((attraction: DiscoveredAttraction) => {
-    preloadHeroImage(attraction.image);
-    setSelectedHeroAttraction(attraction);
-    heroSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
-
-  const matchedRegionalDestination = useMemo(() => {
-    const city = (regionInfo?.city || destPlace?.city || '').trim().toLowerCase();
-    if (!city) return null;
-    return DESTINATIONS.find((d) => city.includes(d.name.toLowerCase()) || d.name.toLowerCase().includes(city)) || null;
-  }, [regionInfo?.city, destPlace?.city]);
-
-  const handleOpenAttractionOverlay = useCallback(
-    (item: DiscoveredAttraction) => {
-      preloadHeroImage(item.image);
-      openDetail({
-        kind: 'place',
-        id: item.id,
-        title: item.name,
-        category: item.category,
-        location: item.location,
-        image: item.image,
-        description: item.shortDescription,
-        bestTime: item.bestVisitingTime,
-        openingHours: item.openingHours,
-        rating: item.rating,
-        userRatingCount: item.userRatingCount,
-        distanceFromPickupKm: item.distanceFromPickupKm,
-        pickupLabel: pickupPlace?.label || destPlace?.label || 'your pickup',
-        destinationId: matchedRegionalDestination?.id,
-        lat: item.lat,
-        lng: item.lng,
-        mapsUrl:
-          item.sourceUrl ||
-          `https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}`,
-        highlights: [
-          item.rawType ? `Spot type: ${item.rawType}` : item.category,
-          `Source: ${item.source}`,
-        ],
-        onCompareRide: () => handleSelectAttraction(item),
-      });
+  const featureCards: Array<{
+    id: 'fare' | 'timing' | 'pitstops';
+    num: string;
+    title: string;
+    subtitle: string;
+    image: string;
+    imageAlt: string;
+    icon: typeof IndianRupee;
+    ctaLabel: string;
+    liveSummary: string;
+    highlights: string[];
+  }> = [
+    {
+      id: 'fare',
+      num: '01',
+      title: 'Fair Fare & Local Voice Pass',
+      subtitle:
+        'Understand reasonable Auto/E-Rickshaw, Cab, and Bike fare ranges for your route and speak politely with drivers in the local language.',
+      image: IMAGES.vehicleAutoRickshaw,
+      imageAlt: 'Indian local auto-rickshaw transport along a sunlit street',
+      icon: IndianRupee,
+      ctaLabel: 'Open Fair Fare & Voice Pass',
+      liveSummary: sharedJourney
+        ? `Ready for ${sharedJourney.distanceKm} km in ${sharedJourney.city || sharedJourney.state || 'this corridor'}`
+        : 'Transparent regional fare bands + Hindi, Odia, Tamil & more voice scripts',
+      highlights: ['Range + tariff formula breakdown', 'Curated local stand tips', 'Speak / Copy Voice Pass'],
     },
-    [openDetail, pickupPlace?.label, destPlace?.label, matchedRegionalDestination?.id]
-  );
-
-  const activeAutoDest = DESTINATIONS[autoSlideIndex % DESTINATIONS.length] || DESTINATIONS[0];
-
-  const handleStartWithDisplayedCity = useCallback(() => {
-    const cityProfile = activeAutoDest;
-    const hub = cityProfile.arrivalHubs[0];
-    const firstAttraction = cityProfile.attractions[0];
-
-    workspaceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    if (!hub || !firstAttraction) return;
-
-    const hubArrivalKind: ArrivalKind =
-      hub.type === 'Airport'
-        ? 'Airport'
-        : hub.type === 'Bus Stand'
-        ? 'Bus Stand'
-        : 'Railway Station';
-
-    const resolvedOrigin: SelectedPlace = {
-      label: hub.name,
-      city: cityProfile.name,
-      state: cityProfile.state,
-      lat: hub.lat,
-      lng: hub.lng,
-      groundTip: hub.groundTip,
-      source: 'Indian Transit Index',
-    };
-    const resolvedDest: SelectedPlace = {
-      label: firstAttraction.name,
-      city: cityProfile.name,
-      state: cityProfile.state,
-      lat: firstAttraction.lat,
-      lng: firstAttraction.lng,
-      source: 'Curated City Highlight',
-    };
-
-    setFormError('');
-    setSelectedState(cityProfile.state);
-    setArrivalKind(hubArrivalKind);
-    setDestKind('Temple / Landmark');
-    setOriginQuery(resolvedOrigin.label);
-    setDestQuery(resolvedDest.label);
-    setOriginOpen(false);
-    setDestOpen(false);
-
-    void executeJourneySearch(
-      resolvedOrigin,
-      resolvedDest,
-      passengers,
-      preferredRideType,
-      hubArrivalKind,
-      'Temple / Landmark'
-    );
-  }, [activeAutoDest, executeJourneySearch, passengers, preferredRideType]);
-
-  const heroShowcase: CinematicHeroShowcase = useMemo(() => {
-    if (selectedHeroAttraction) {
-      const facts: HeroFactItem[] = [
-        {
-          label: 'Distance from Pickup',
-          value: `${selectedHeroAttraction.distanceFromPickupKm} km`,
-        },
-        {
-          label:
-            selectedHeroAttraction.category === 'Adventure & Experiences'
-              ? 'Best Window'
-              : 'Best Visiting Time',
-          value: selectedHeroAttraction.bestVisitingTime,
-        },
-      ];
-
-      if (selectedHeroAttraction.openingHours) {
-        facts.push({
-          label: 'Opening Hours',
-          value: selectedHeroAttraction.openingHours,
-        });
-      } else if (typeof selectedHeroAttraction.rating === 'number') {
-        facts.push({
-          label: 'Visitor Rating',
-          value: `${selectedHeroAttraction.rating.toFixed(1)} (${
-            selectedHeroAttraction.userRatingCount || 'Google'
-          })`,
-        });
-      } else {
-        facts.push({
-          label: 'Source',
-          value: selectedHeroAttraction.source,
-        });
-      }
-
-      const fallbackTone: CinematicHeroShowcase['fallbackTone'] =
-        selectedHeroAttraction.category === 'Cafe Corner'
-          ? 'coffee'
-          : selectedHeroAttraction.category === 'Adventure & Experiences'
-          ? 'mountain'
-          : selectedHeroAttraction.category === 'Temples & Heritage'
-          ? 'heritage'
-          : 'teal';
-
-      return {
-        key: `attraction-${selectedHeroAttraction.id}`,
-        eyebrow: `${selectedHeroAttraction.category} · ${selectedHeroAttraction.location}`,
-        title: selectedHeroAttraction.name,
-        description: selectedHeroAttraction.shortDescription,
-        image: selectedHeroAttraction.image,
-        imageAlt: `${selectedHeroAttraction.name} — ${selectedHeroAttraction.location}`,
-        fallbackTone,
-        facts,
-        isItemSelected: true,
-        resetLabel: `Back to ${destinationCityHeading} overview`,
-        onReset: () => setSelectedHeroAttraction(null),
-        primaryAction: {
-          label: 'Compare Rides to This Place',
-          onClick: () => handleSelectAttraction(selectedHeroAttraction),
-        },
-        secondaryActions: [
-          ...(selectedHeroAttraction.sourceUrl
-            ? [{ label: 'Maps & Reference', href: selectedHeroAttraction.sourceUrl }]
-            : []),
-          {
-            label: 'Back to Destinations',
-            onClick: () =>
-              exploreSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-          },
-        ],
-      };
-    }
-
-    const overviewPhoto =
-      matchedRegionalDestination?.heroImage ||
-      attractions.find((a) => Boolean(a.image))?.image ||
-      IMAGES.udaipurHero;
-
-    if (regionInfo || destPlace) {
-      const cityTitle = regionInfo?.city || destPlace?.city || 'Your Destination';
-      const stateTitle = regionInfo?.state || destPlace?.state || selectedState || 'India';
-      return {
-        key: `region-${cityTitle}-${stateTitle}`,
-        eyebrow: `01. Arrival & Local Discovery · ${stateTitle}`,
-        title: `${cityTitle}, ${stateTitle}`,
-        description:
-          matchedRegionalDestination?.tagline ||
-          `Compare your arrival ride into ${cityTitle} and click any temple, cafe, nature spot, or experience below to preview it full-screen.`,
-        image: overviewPhoto,
-        imageAlt: `${cityTitle}, ${stateTitle} regional skyline`,
-        fallbackTone: 'teal',
-        facts: [
-          ...(originPlace
-            ? [{ label: 'Arriving At', value: originPlace.label }]
-            : []),
-          ...(destPlace
-            ? [{ label: 'First Stop', value: destPlace.label }]
-            : []),
-          ...(attractions.length > 0
-            ? [{ label: 'Discovered Spots', value: `${attractions.length} places nearby` }]
-            : []),
-        ],
-        primaryAction: {
-          label: compareResult ? 'View Ride Comparison' : 'Get Started',
-          onClick: () =>
-            workspaceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-        },
-        secondaryActions:
-          attractions.length > 0
-            ? [
-                {
-                  label: 'Explore Nearby Places',
-                  onClick: () =>
-                    exploreSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-                },
-              ]
-            : undefined,
-      };
-    }
-
-    return {
-      key: `travel-assist-auto-${activeAutoDest.id}`,
-      eyebrow: `01. Travel Assist · ${activeAutoDest.state}`,
-      title: `${activeAutoDest.name}, ${activeAutoDest.state}`,
-      accentWord: activeAutoDest.name,
-      description: activeAutoDest.tagline,
-      image: activeAutoDest.heroImage,
-      imageAlt: `${activeAutoDest.name}, ${activeAutoDest.state} destination showcase`,
-      fallbackTone: 'teal',
-      facts: [
-        ...(activeAutoDest.arrivalHubs[0]
-          ? [{ label: 'Arriving At', value: activeAutoDest.arrivalHubs[0].name }]
-          : []),
-        ...(activeAutoDest.attractions[0]
-          ? [{ label: 'First Stop', value: activeAutoDest.attractions[0].name }]
-          : []),
-        { label: 'Best Season', value: activeAutoDest.bestSeason },
-      ],
-      primaryAction: {
-        label: `Plan ${activeAutoDest.name} Arrival`,
-        onClick: handleStartWithDisplayedCity,
-      },
-      secondaryActions: [
-        {
-          label: 'Enter Custom Route',
-          onClick: () =>
-            workspaceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-        },
-      ],
-    };
-  }, [
-    selectedHeroAttraction,
-    destinationCityHeading,
-    matchedRegionalDestination,
-    attractions,
-    regionInfo,
-    destPlace,
-    selectedState,
-    originPlace,
-    compareResult,
-    activeAutoDest,
-    handleStartWithDisplayedCity,
-  ]);
+    {
+      id: 'timing',
+      num: '02',
+      title: 'Timing & Crowd Clock',
+      subtitle:
+        'Calculate arrival windows with walk, parking, and darshan buffers against closing hours, sunset cutoffs, or return train/bus departures.',
+      image: IMAGES.jagannathTemple,
+      imageAlt: 'Historic Indian temple spire during evening darshan light',
+      icon: Clock,
+      ctaLabel: 'Open Timing & Crowd Clock',
+      liveSummary:
+        sharedJourney && activeDuration !== null
+          ? `~${activeDuration} min transit + customizable buffers (${sharedJourney.isTrafficAware ? 'traffic-aware' : 'road estimate'})`
+          : 'SAFE / HURRY / RISK deadline status + return departure countdown',
+      highlights: ['Opening & closing hours check', 'User return train/bus planner', 'Honest crowd data status'],
+    },
+    {
+      id: 'pitstops',
+      num: '03',
+      title: 'Zero-Detour En-route Pitstops',
+      subtitle:
+        'Discover washrooms, pure-veg eateries, local food, ATMs, pharmacies, and cloakrooms along your actual route corridor with real detour checks.',
+      image: IMAGES.cafeRooftop,
+      imageAlt: 'Local Indian cafe and pitstop spot on a scenic travel corridor',
+      icon: Compass,
+      ctaLabel: 'Open En-route Pitstops',
+      liveSummary: sharedJourney
+        ? `Scans ${sharedJourney.distanceKm} km corridor geometry in route order`
+        : 'Route-ordered stops + actual road detour measurement',
+      highlights: ['6 essential traveler categories', 'Real road-detour calculation', 'Direct Google Maps link'],
+    },
+  ];
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F6F0] text-[#142322]">
       <Navbar />
 
-      <main className="flex-1">
-        {/* CINEMATIC AUTO-CYCLING DESTINATION HERO */}
-        <CinematicDestinationHero
-          sectionRef={heroSectionRef}
-          showcase={heroShowcase}
-          autoSlideIndicator={
-            autoCycleActive
-              ? {
-                  total: DESTINATIONS.length,
-                  activeIndex: autoSlideIndex,
-                  durationMs: 6000,
-                  paused: isPageHidden,
-                }
-              : undefined
-          }
-          bottomSurface="#F8F6F0"
-        />
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-8">
+        {/* Compact Editorial Header — immediately surfaces the planner without an oversized decorative hero */}
+        <Reveal immediate className="max-w-3xl space-y-2.5">
+          <p className="eyebrow-mono font-semibold text-[#123D3A] flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-[#E9A34A]" aria-hidden="true" />
+            <span>TRAVEL ASSIST · GROUND-LEVEL ROUTE INTELLIGENCE</span>
+          </p>
+          <h1 className="font-editorial text-4xl sm:text-5xl font-semibold text-[#142322] tracking-tight leading-[1.1]">
+            SMART LOCAL HOP
+          </h1>
+          <p className="text-lg sm:text-xl font-medium text-[#123D3A] leading-snug">
+            Know the fare. Beat the clock. Find what you need along the way.
+          </p>
+          <p className="text-base text-[#495553] leading-relaxed">
+            Your intelligent local journey companion for temples, beaches, markets, attractions,
+            railway stations and everyday travel across India.
+          </p>
+        </Reveal>
 
-        {/* WORKSPACE SECTION: VISUALLY CONNECTED PROGRESS TRACKER + ATMOSPHERIC BACKDROP + TWO-COLUMN CARD */}
+        {/* Main Smart Local Hop Planner */}
         <section
-          id="travel-assist-workspace"
-          ref={workspaceRef}
-          className="relative overflow-x-clip bg-gradient-to-b from-[#F8F6F0] via-[#F9F7F1] to-[#F8F6F0]"
+          ref={plannerSectionRef}
+          aria-labelledby="planner-heading"
+          className="rounded-3xl bg-white border border-[#DFD8C8] p-5 sm:p-7 shadow-[0_18px_40px_-22px_rgba(18,61,58,0.22)]"
         >
-          {/* Very light atmospheric blurred travel silhouette + soft warm radial wash behind tracker & form */}
-          <div
-            className="absolute inset-x-0 top-0 h-[520px] pointer-events-none overflow-hidden"
-            aria-hidden="true"
-          >
-            {heroShowcase.image && (
-              <img
-                src={heroShowcase.image}
-                alt=""
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover object-bottom opacity-[0.04] blur-xl scale-105 transition-opacity duration-700"
-              />
-            )}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(140,201,232,0.12)_0%,_rgba(248,246,240,0.65)_48%,_#F8F6F0_92%)]" />
-          </div>
-
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-7 sm:-mt-9 pb-10 sm:pb-14 z-20">
-            {/* Progress Tracker visually bridging hero curve into form */}
-            <TravelProgressTracker activeStage={activeStage} />
-
-            {/* Unified Two-Column Container */}
-            <div className="bg-white rounded-[28px] border border-[#E5DFD3] shadow-sm p-5 sm:p-7 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
-            {/* LEFT COLUMN: Arrival & Destination Form */}
-            <form onSubmit={handleFindMyRide} className="lg:col-span-5 space-y-5">
-              {/* Heading Row + Compact State Scope */}
-              <div className="flex items-start gap-3">
-                <span className="w-11 h-11 rounded-2xl bg-[#123D3A]/10 text-[#123D3A] flex items-center justify-center shrink-0 mt-0.5">
-                  <Car className="w-5 h-5" aria-hidden="true" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h2 className="font-serif text-[26px] sm:text-[29px] font-bold text-[#142322] leading-tight">
-                    Where are you arriving?
-                  </h2>
-                  <p className="text-sm text-[#495553] mt-0.5 leading-snug">
-                    Find your best way to reach your first stop and explore everything nearby.
-                  </p>
-                </div>
-              </div>
-
-              {/* Compact State / UT Filter */}
-              <div className="flex items-center justify-between gap-3 bg-[#F8F6F0] rounded-xl border border-[#E5DFD3] px-3.5 py-2.5">
-                <label htmlFor="india-state-select" className="text-sm font-semibold text-[#123D3A] shrink-0">
-                  State / UT
-                </label>
-                <select
-                  id="india-state-select"
-                  value={selectedState}
-                  onChange={(e) => {
-                    setSelectedState(e.target.value);
-                    setOriginPlace(null);
-                  }}
-                  className="bg-transparent text-sm font-medium text-[#142322] focus:outline-none text-right truncate max-w-[230px] cursor-pointer"
-                >
-                  <option value="">All India (28 States &amp; 8 UTs)</option>
-                  {INDIA_STATES_AND_UTS.map((st) => (
-                    <option key={st.code} value={st.name}>
-                      {st.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* FIELD 1: I'm arriving at */}
-              <div className="space-y-2.5" ref={originWrapRef}>
-                <label
-                  htmlFor="arrival-origin-input"
-                  className="block text-sm font-bold text-[#142322]"
-                >
-                  I&apos;m arriving at
-                </label>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {ARRIVAL_OPTIONS.map((opt) => {
-                    const active = arrivalKind === opt.kind;
-                    return (
-                      <button
-                        key={opt.kind}
-                        type="button"
-                        onClick={() => {
-                          setArrivalKind(opt.kind);
-                          setOriginSuggestions([]);
-                          setOriginOpen(true);
-                        }}
-                        className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-2.5 min-h-[42px] rounded-xl text-sm font-semibold border transition-colors cursor-pointer ${
-                          active
-                            ? 'bg-[#123D3A] text-white border-[#123D3A] shadow-2xs'
-                            : 'bg-[#F8F6F0] text-[#142322] border-[#E5DFD3] hover:border-[#123D3A]/45'
-                        }`}
-                      >
-                        <KindIcon kind={opt.kind} />
-                        <span className="truncate">{opt.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="relative">
-                  <div className="relative flex items-center">
-                    <Search
-                      className="w-4 h-4 text-[#5A6664] absolute left-3.5 pointer-events-none"
-                      aria-hidden="true"
-                    />
-                    <input
-                      id="arrival-origin-input"
-                      type="text"
-                      value={originQuery}
-                      onFocus={() => setOriginOpen(true)}
-                      onChange={(e) => {
-                        setOriginQuery(e.target.value);
-                        setOriginPlace(null);
-                        setOriginOpen(true);
-                      }}
-                      placeholder={currentOriginMeta.placeholder}
-                      autoComplete="off"
-                      className="w-full h-11 pl-10 pr-9 rounded-xl border border-[#D8D0C0] bg-white text-sm text-[#142322] placeholder:text-[#78827F] focus:outline-none focus:border-[#123D3A] focus:ring-2 focus:ring-[#123D3A]/15"
-                    />
-                    {originQuery && (
-                      <button
-                        type="button"
-                        aria-label="Clear starting point"
-                        onClick={() => {
-                          setOriginQuery('');
-                          setOriginPlace(null);
-                          setOriginOpen(true);
-                        }}
-                        className="absolute right-2.5 p-1.5 text-[#5A6664] hover:text-[#142322] cursor-pointer"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Category-Strict Origin Autocomplete Dropdown */}
-                  {originOpen && (
-                    <div className="absolute z-30 mt-1.5 w-full bg-white rounded-2xl border border-[#D8D0C0] shadow-xl max-h-72 overflow-y-auto divide-y divide-[#F1ECE2]">
-                      <div className="px-3.5 py-2 bg-[#F8F6F0] eyebrow-mono text-[#5A6664]">
-                        {arrivalKind} Suggestions
-                      </div>
-
-                      {originLoading && <SuggestSkeleton rows={3} />}
-
-                      {!originLoading && originSuggestions.length === 0 && (
-                        <div className="p-3.5 space-y-2 text-sm text-[#495553]">
-                          <p>
-                            {originQuery.trim().length < 2
-                              ? `Type a ${arrivalKind.toLowerCase()} name or city to search.`
-                              : `No matching ${arrivalKind.toLowerCase()} found for "${originQuery.trim()}".`}
-                          </p>
-                          {originQuery.trim().length >= 2 && (
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                setOriginOpen(false);
-                                const resolved = await resolveCustomTextPlace(
-                                  originQuery,
-                                  currentOriginMeta.apiKind,
-                                  null
-                                );
-                                if (resolved) setOriginPlace(resolved);
-                              }}
-                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#F3EFE6] text-[#123D3A] text-sm font-semibold hover:bg-[#EAE3D5]"
-                            >
-                              <MapPin className="w-4 h-4" />
-                              <span>Use &ldquo;{originQuery.trim()}&rdquo;</span>
-                            </button>
-                          )}
-                        </div>
-                      )}
-
-                      {originSuggestions.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => {
-                            setOriginQuery(item.label);
-                            setOriginPlace({
-                              label: item.label,
-                              city: item.city,
-                              state: item.state,
-                              lat: item.lat,
-                              lng: item.lng,
-                              groundTip: item.groundTip,
-                              source: item.source,
-                            });
-                            if (item.state && !selectedState) {
-                              setSelectedState(item.state);
-                            }
-                            setOriginOpen(false);
-                          }}
-                          className="w-full text-left px-3.5 py-2.5 hover:bg-[#F8F6F0] transition-colors flex items-start justify-between gap-2 cursor-pointer"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-[#142322] truncate">
-                              {item.label}
-                            </p>
-                            <p className="text-sm text-[#495553] truncate mt-0.5">
-                              {item.subtitle}
-                            </p>
-                          </div>
-                          <span className="text-sm font-medium text-[#5A6664] shrink-0 pt-0.5">
-                            {item.source}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* FIELD 2: Where do you want to go first? */}
-              <div className="space-y-2.5" ref={destWrapRef}>
-                <label
-                  htmlFor="arrival-dest-input"
-                  className="block text-sm font-bold text-[#142322]"
-                >
-                  Where do you want to go first?
-                </label>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {FIRST_DEST_OPTIONS.map((opt) => {
-                    const active = destKind === opt.kind;
-                    return (
-                      <button
-                        key={opt.kind}
-                        type="button"
-                        onClick={() => {
-                          setDestKind(opt.kind);
-                          setDestSuggestions([]);
-                          setDestOpen(true);
-                        }}
-                        className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-2.5 min-h-[42px] rounded-xl text-sm font-semibold border transition-colors cursor-pointer ${
-                          active
-                            ? 'bg-[#123D3A] text-white border-[#123D3A] shadow-2xs'
-                            : 'bg-[#F8F6F0] text-[#142322] border-[#E5DFD3] hover:border-[#123D3A]/45'
-                        }`}
-                      >
-                        <DestKindIcon kind={opt.kind} />
-                        <span className="truncate">{opt.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="relative">
-                  <div className="relative flex items-center">
-                    <MapPin
-                      className="w-4 h-4 text-[#E9A34A] absolute left-3.5 pointer-events-none"
-                      aria-hidden="true"
-                    />
-                    <input
-                      id="arrival-dest-input"
-                      type="text"
-                      value={destQuery}
-                      onFocus={() => setDestOpen(true)}
-                      onChange={(e) => {
-                        setDestQuery(e.target.value);
-                        setDestPlace(null);
-                        setDestOpen(true);
-                      }}
-                      placeholder={currentDestMeta.placeholder}
-                      autoComplete="off"
-                      className="w-full h-11 pl-10 pr-9 rounded-xl border border-[#D8D0C0] bg-white text-sm text-[#142322] placeholder:text-[#78827F] focus:outline-none focus:border-[#123D3A] focus:ring-2 focus:ring-[#123D3A]/15"
-                    />
-                    {destQuery && (
-                      <button
-                        type="button"
-                        aria-label="Clear first destination"
-                        onClick={() => {
-                          setDestQuery('');
-                          setDestPlace(null);
-                          setDestOpen(true);
-                        }}
-                        className="absolute right-2.5 p-1.5 text-[#5A6664] hover:text-[#142322] cursor-pointer"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Category-Strict Destination Autocomplete Dropdown */}
-                  {destOpen && (
-                    <div className="absolute z-30 mt-1.5 w-full bg-white rounded-2xl border border-[#D8D0C0] shadow-xl max-h-72 overflow-y-auto divide-y divide-[#F1ECE2]">
-                      <div className="px-3.5 py-2 bg-[#F8F6F0] eyebrow-mono text-[#5A6664]">
-                        {destKind} Suggestions
-                      </div>
-
-                      {destLoading && <SuggestSkeleton rows={3} />}
-
-                      {!destLoading && destSuggestions.length === 0 && (
-                        <div className="p-3.5 space-y-2 text-sm text-[#495553]">
-                          <p>
-                            {destQuery.trim().length < 2
-                              ? currentDestMeta.emptyHint
-                              : `No matching ${destKind.toLowerCase()} found for "${destQuery.trim()}".`}
-                          </p>
-                          {destQuery.trim().length >= 2 && (
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                setDestOpen(false);
-                                const resolved = await resolveCustomTextPlace(
-                                  destQuery,
-                                  currentDestMeta.apiKind,
-                                  originPlace
-                                );
-                                if (resolved) setDestPlace(resolved);
-                              }}
-                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#F3EFE6] text-[#123D3A] text-sm font-semibold hover:bg-[#EAE3D5]"
-                            >
-                              <MapPin className="w-4 h-4" />
-                              <span>Use &ldquo;{destQuery.trim()}&rdquo;</span>
-                            </button>
-                          )}
-                        </div>
-                      )}
-
-                      {destSuggestions.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => {
-                            setDestQuery(item.label);
-                            setDestPlace({
-                              label: item.label,
-                              city: item.city,
-                              state: item.state,
-                              lat: item.lat,
-                              lng: item.lng,
-                              source: item.source,
-                            });
-                            setDestOpen(false);
-                          }}
-                          className="w-full text-left px-3.5 py-2.5 hover:bg-[#F8F6F0] transition-colors flex items-start justify-between gap-2 cursor-pointer"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-[#142322] truncate">
-                              {item.label}
-                            </p>
-                            <p className="text-sm text-[#495553] truncate mt-0.5">
-                              {item.subtitle}
-                            </p>
-                          </div>
-                          <span className="text-sm font-medium text-[#5A6664] shrink-0 pt-0.5">
-                            {item.source}
-                          </span>
-                        </button>
-                      ))}
-
-                      {destQuery.trim().length >= 2 && destSuggestions.length > 0 && (
-                        <div className="px-3.5 py-2.5 bg-[#F8F6F0] flex items-center justify-between gap-2">
-                          <span className="text-sm text-[#5A6664]">Specific street or guesthouse?</span>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setDestOpen(false);
-                              const resolved = await resolveCustomTextPlace(
-                                destQuery,
-                                currentDestMeta.apiKind,
-                                originPlace
-                              );
-                              if (resolved) setDestPlace(resolved);
-                            }}
-                            className="text-sm font-semibold text-[#123D3A] hover:underline"
-                          >
-                            Use &ldquo;{destQuery.trim()}&rdquo;
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* FIELD 3: Passengers Stepper (- 2 +) matching UI reference */}
-              <div className="flex items-center justify-between gap-4 pt-1">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-[#123D3A]" aria-hidden="true" />
-                  <span className="text-sm font-bold text-[#142322]">Passengers</span>
-                </div>
-
-                <div
-                  className="inline-flex items-center gap-3 bg-[#F8F6F0] border border-[#E5DFD3] rounded-full px-2 py-1"
-                  role="group"
-                  aria-label="Passenger count stepper"
-                >
-                  <button
-                    type="button"
-                    aria-label="Decrease passengers"
-                    disabled={passengers <= 1}
-                    onClick={() => handleStepPassengers(-1)}
-                    className="w-8 h-8 rounded-full bg-white border border-[#D8D0C0] flex items-center justify-center text-[#142322] hover:border-[#123D3A] disabled:opacity-40 cursor-pointer"
-                  >
-                    <Minus className="w-3.5 h-3.5" aria-hidden="true" />
-                  </button>
-                  <span className="font-mono font-bold text-base text-[#142322] min-w-[24px] text-center">
-                    {passengers === 6 ? '6+' : passengers}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Increase passengers"
-                    disabled={passengers >= 6}
-                    onClick={() => handleStepPassengers(1)}
-                    className="w-8 h-8 rounded-full bg-white border border-[#D8D0C0] flex items-center justify-center text-[#142322] hover:border-[#123D3A] disabled:opacity-40 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-
-              {/* FIELD 4: How would you like to travel? (Compact Visual Cards) */}
-              <div className="pt-2 border-t border-[#E5DFD3] space-y-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="eyebrow-mono font-bold text-[#123D3A]">
-                    How would you like to travel?
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setPreferredRideType('all')}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors cursor-pointer ${
-                      preferredRideType === 'all'
-                        ? 'bg-[#123D3A] text-white border-[#123D3A]'
-                        : 'bg-[#F8F6F0] text-[#123D3A] border-[#D8D0C0] hover:border-[#123D3A]'
-                    }`}
-                  >
-                    Compare All
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2.5">
-                  {RIDE_MODE_CARDS.map((card) => {
-                    const selected = preferredRideType === card.mode;
-                    return (
-                      <button
-                        key={card.mode}
-                        type="button"
-                        onClick={() => setPreferredRideType(card.mode)}
-                        aria-pressed={selected}
-                        className={`group text-left rounded-xl border overflow-hidden transition-all cursor-pointer ${
-                          selected
-                            ? 'border-[#123D3A] ring-2 ring-[#123D3A]/20 bg-[#F8F6F0]'
-                            : 'border-[#E5DFD3] bg-white hover:border-[#123D3A]/40'
-                        }`}
-                      >
-                        <div className="aspect-[16/10] w-full overflow-hidden bg-[#F3EFE6] relative">
-                          <img
-                            src={card.image}
-                            alt={`${card.title} — ${card.tagline}`}
-                            className="w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-300"
-                          />
-                          {selected && (
-                            <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-[#123D3A] text-white flex items-center justify-center shadow-xs">
-                              <Check className="w-3 h-3" aria-hidden="true" />
-                            </span>
-                          )}
-                        </div>
-                        <div className="p-2.5">
-                          <p className="text-sm font-bold text-[#142322] leading-tight">{card.title}</p>
-                          <p className="text-sm text-[#5A6664] truncate">{card.tagline}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Saffron Primary Submit CTA ("Find My Ride ->") */}
-              <button
-                type="submit"
-                disabled={findingRide}
-                className="w-full inline-flex items-center justify-center gap-2.5 h-12 rounded-xl bg-[#E9A34A] text-[#142322] text-[15px] font-bold hover:bg-[#DF9538] disabled:opacity-60 transition-colors shadow-xs cursor-pointer"
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-5">
+            <div>
+              <h2
+                id="planner-heading"
+                className="font-editorial text-2xl sm:text-3xl font-semibold text-[#142322]"
               >
-                {findingRide ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                    <span>Calculating Road Route &amp; Fares...</span>
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4" aria-hidden="true" />
-                    <span>Find My Ride</span>
-                    <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                  </>
-                )}
-              </button>
-
-              {formError && (
-                <div
-                  role="alert"
-                  className="rounded-xl bg-red-50 border border-red-200 px-3.5 py-2.5 text-sm text-red-900 flex items-start gap-2"
-                >
-                  <AlertCircle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" aria-hidden="true" />
-                  <span>{formError}</span>
-                </div>
-              )}
-
-              {/* Quick Sample Route Shortcuts (Always execute real OSRM + API compare) */}
-              <div className="pt-1 flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold text-[#5A6664] mr-1">Try live route:</span>
-                {QUICK_SAMPLE_ROUTES.map((sample) => (
-                  <button
-                    key={sample.id}
-                    type="button"
-                    onClick={() => handleLoadSample(sample)}
-                    className="px-3 py-1.5 rounded-lg bg-[#F8F6F0] border border-[#E5DFD3] text-sm font-medium text-[#123D3A] hover:border-[#123D3A] hover:bg-[#F3EFE6] transition-colors cursor-pointer"
-                  >
-                    {sample.title}
-                  </button>
-                ))}
-              </div>
-            </form>
-
-            {/* RIGHT COLUMN: Live Route Comparison Results + OSRM Polyline Map */}
-            <div className="lg:col-span-7 lg:border-l lg:border-[#E5DFD3]/70 lg:pl-7 space-y-5">
-              {findingRide ? (
-                <div className="space-y-4">
-                  <p className="text-sm font-medium text-[#495553]">
-                    Querying OSRM road routing and comparing Rapido, Ola, Uber, and Prepaid Stand tariffs…
-                  </p>
-                  <RideCompareSkeleton columns={3} />
-                </div>
-              ) : compareError ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50/60 p-7 text-center space-y-3">
-                  <AlertCircle className="w-8 h-8 text-red-700 mx-auto" />
-                  <p className="text-base font-semibold text-red-900">{compareError}</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (originPlace && destPlace) {
-                        runLiveCompare(originPlace, destPlace, passengers, selectedState);
-                      }
-                    }}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#E9A34A] text-[#142322] text-sm font-bold hover:bg-[#DF9538] cursor-pointer"
-                  >
-                    Retry Route Calculation
-                  </button>
-                </div>
-              ) : compareResult ? (
-                <>
-                  <RideComparisonSection
-                    compareResult={compareResult}
-                    passengers={passengers}
-                    initialCategory={preferredRideType}
-                    onCategoryChange={(cat) => setPreferredRideType(cat)}
-                    layoutVariant="split-grid"
-                  />
-
-                  {/* Compact Live OSRM Route Polyline Map + Full Compare Page Link */}
-                  <div className="space-y-3 pt-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="eyebrow-mono font-bold text-[#123D3A] flex items-center gap-1.5">
-                        <Route className="w-4 h-4 text-[#E9A34A]" aria-hidden="true" />
-                        <span>Live Route Polyline Preview</span>
-                      </p>
-                      <Link
-                        to={fullCompareHref}
-                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#123D3A] hover:underline"
-                      >
-                        <span>Open Full Route &amp; Save Options</span>
-                        <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                      </Link>
-                    </div>
-                    <GoogleRouteMap
-                      stops={mapStops}
-                      routeGeometry={compareResult.route.geometry}
-                      heightClass="h-[225px]"
-                    />
-                  </div>
-                </>
-              ) : (
-                <div className="rounded-2xl border border-[#E5DFD3] bg-[#FDFBF7] p-6 sm:p-8 space-y-6">
-                  <div className="space-y-2">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#123D3A]/10 text-[#123D3A] text-sm font-semibold">
-                      <Sparkles className="w-4 h-4 text-[#E9A34A]" aria-hidden="true" />
-                      <span>Real Road Routing &amp; Transparent Tariff Engine</span>
-                    </span>
-                    <h3 className="font-serif text-2xl sm:text-[28px] font-semibold text-[#142322] leading-snug">
-                      Compare Bike, Auto, and Cab fares side-by-side
-                    </h3>
-                    <p className="text-[15px] text-[#495553] leading-relaxed">
-                      Enter where you are arriving and your first destination on the left, or launch one of these live Indian corridors right now to compute OSRM road distance, polyline route, and itemized provider estimates.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {QUICK_SAMPLE_ROUTES.map((sample) => (
-                      <button
-                        key={`card-${sample.id}`}
-                        type="button"
-                        onClick={() => handleLoadSample(sample)}
-                        className="text-left p-4 rounded-xl bg-white border border-[#E5DFD3] hover:border-[#123D3A] hover:shadow-xs transition-all space-y-1.5 cursor-pointer"
-                      >
-                        <p className="eyebrow-mono font-bold text-[#E9A34A]">
-                          {sample.state}
-                        </p>
-                        <p className="text-sm font-bold text-[#142322] leading-snug">
-                          {sample.title}
-                        </p>
-                        <p className="text-sm text-[#123D3A] font-semibold inline-flex items-center gap-1 pt-1">
-                          <span>Compute Live Route</span>
-                          <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-[#E5DFD3] text-sm text-[#495553]">
-                    <div className="space-y-1">
-                      <p className="font-bold text-[#142322]">Category-Strict India Search</p>
-                      <p>Stations, bus stands, airports, temples, and hotels each search their exact directory.</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="font-bold text-[#142322]">Itemized Fare Cards</p>
-                      <p>Inspect base fare, per-km slab, time charge, booking fee, and regional source notes.</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="font-bold text-[#142322]">Local Sightseeing &amp; Cafes</p>
-                      <p>Once routed, explore attractions, Cafe Corner, and Adventure experiences nearby.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
+                Where are you heading?
+              </h2>
+              <p className="text-sm text-[#5A6664] mt-0.5">
+                Pick real places from suggestions or GPS — one verified road route powers all three tools.
+              </p>
             </div>
+            {sharedJourney && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#123D3A]/8 border border-[#123D3A]/20 text-xs font-mono font-semibold text-[#123D3A] self-start sm:self-auto">
+                <Route className="w-3.5 h-3.5 text-[#E9A34A]" aria-hidden="true" />
+                <span>Shared Journey Active · {sharedJourney.distanceKm} km</span>
+              </span>
+            )}
           </div>
-          </div>
-        </section>
 
-        {/* EXPLORE ALL DESTINATIONS IN [CITY] SECTION */}
-        {(discoverLoading || attractions.length > 0 || discoverError) && (
-          <section
-            id="explore-destinations"
-            ref={exploreSectionRef}
-            onMouseEnter={() => setExploringSectionActive(true)}
-            className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-14 pt-2 space-y-7"
-          >
-            {/* Header Strip Matching UI Reference */}
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
-              <div className="flex items-start gap-3 max-w-3xl">
-                <span className="w-10 h-10 rounded-full bg-[#E9A34A]/20 text-[#123D3A] flex items-center justify-center shrink-0 mt-1">
-                  <MapPin className="w-5 h-5 text-[#123D3A]" aria-hidden="true" />
-                </span>
-                <div>
-                  <h2 className="font-serif text-[26px] sm:text-[32px] font-bold text-[#142322] leading-tight">
-                    Explore All Destinations in {destinationCityHeading}
-                  </h2>
-                  <p className="text-sm sm:text-base text-[#495553] mt-1">
-                    Discover temples, beaches, cafes, and regional attractions across{' '}
-                    {regionInfo?.state || destPlace?.state || 'this destination'}.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 shrink-0">
-                {pickupPlace && (
-                  <div
-                    ref={pickupWrapRef}
-                    className="relative bg-white border border-[#E5DFD3] rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-2xs"
+          <form onSubmit={handleExploreJourney} className="space-y-5">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-4 items-start">
+              {/* FROM LOCATION */}
+              <div ref={originWrapRef} className="relative space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <label
+                    htmlFor="smart-hop-from"
+                    className="text-xs font-mono font-bold uppercase tracking-[0.08em] text-[#123D3A]"
                   >
-                    <div className="min-w-0 max-w-[210px]">
-                      <p className="eyebrow-mono font-bold text-[#5A6664]">
-                        Pickup Reference
-                      </p>
-                      <p className="text-sm font-semibold text-[#123D3A] truncate">
-                        {pickupPlace.label}
-                      </p>
-                    </div>
+                    FROM · STARTING POINT
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentLocation}
+                    disabled={gpsLoading}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#F5F1E8] border border-[#DFD8C8] hover:border-[#123D3A]/40 text-xs font-semibold text-[#123D3A] transition-colors disabled:opacity-60"
+                  >
+                    {gpsLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Crosshair className="w-3.5 h-3.5 text-[#E9A34A]" aria-hidden="true" />
+                    )}
+                    <span>{gpsLoading ? 'Locating...' : 'Use Current Location'}</span>
+                  </button>
+                </div>
+
+                {/* FROM category pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                  {FROM_CATEGORIES.map((cat) => {
+                    const active = originKind === cat.kind;
+                    return (
+                      <button
+                        key={cat.kind}
+                        type="button"
+                        onClick={() => {
+                          setOriginKind(cat.kind);
+                          setOriginOpen(true);
+                        }}
+                        className={`ys-chip shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium border ${
+                          active
+                            ? 'bg-[#123D3A] text-white border-[#123D3A]'
+                            : 'bg-[#FAF8F3] text-[#495553] border-[#E5DFD3] hover:border-[#123D3A]/40'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="relative">
+                  <MapPin
+                    className="w-4 h-4 text-[#123D3A] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                    aria-hidden="true"
+                  />
+                  <input
+                    id="smart-hop-from"
+                    type="text"
+                    value={originQuery}
+                    onFocus={() => setOriginOpen(true)}
+                    onChange={(e) => {
+                      setOriginQuery(e.target.value);
+                      setOriginPlace(null);
+                      setOriginOpen(true);
+                      setPlannerError(null);
+                    }}
+                    placeholder="e.g., Puri Station, Katra SVDK, Varanasi Jn, Airport..."
+                    autoComplete="off"
+                    className="ys-input w-full pl-10 pr-10 py-3.5 min-h-[50px] rounded-xl bg-[#FAF8F3] border border-[#D7CFC1] text-base text-[#142322] placeholder:text-[#6B7775] focus:bg-white focus:outline-none"
+                  />
+                  {originQuery && (
                     <button
                       type="button"
                       onClick={() => {
-                        setEditingPickup((prev) => !prev);
-                        setPickupOpen(true);
+                        setOriginQuery('');
+                        setOriginPlace(null);
+                        setOriginOpen(true);
                       }}
-                      className="inline-flex items-center gap-1 text-sm font-bold text-[#123D3A] hover:underline cursor-pointer shrink-0"
+                      aria-label="Clear starting point"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-[#5A6664] hover:text-[#142322] hover:bg-[#EFECE3]"
                     >
-                      <Edit3 className="w-4 h-4" aria-hidden="true" />
-                      <span>{editingPickup ? 'Close' : 'Edit'}</span>
+                      <X className="w-4 h-4" aria-hidden="true" />
                     </button>
+                  )}
+                </div>
 
-                    {editingPickup && (
-                      <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white rounded-xl border border-[#D8D0C0] shadow-xl p-2.5 z-30">
-                        <input
-                          type="text"
-                          value={pickupQuery}
-                          onFocus={() => setPickupOpen(true)}
-                          onChange={(e) => {
-                            setPickupQuery(e.target.value);
-                            setPickupOpen(true);
-                          }}
-                          placeholder="Change pickup hotel or landmark..."
-                          className="w-full h-10 px-3 rounded-lg border border-[#D8D0C0] bg-[#F8F6F0] text-sm text-[#142322] focus:outline-none focus:border-[#123D3A]"
-                        />
-                        {pickupOpen && (
-                          <div className="mt-1.5 max-h-48 overflow-y-auto divide-y divide-[#F1ECE2]">
-                            {pickupLoading && <SuggestSkeleton rows={2} />}
-                            {pickupSuggestions.map((s) => (
-                              <button
-                                key={s.id}
-                                type="button"
-                                onClick={() =>
-                                  handleApplyNewPickup({
-                                    label: s.label,
-                                    city: s.city,
-                                    state: s.state,
-                                    lat: s.lat,
-                                    lng: s.lng,
-                                    source: s.source,
-                                  })
-                                }
-                                className="w-full text-left px-2 py-2 hover:bg-[#F8F6F0] text-sm cursor-pointer"
-                              >
-                                <p className="font-semibold text-[#142322] truncate">{s.label}</p>
-                                <p className="text-sm text-[#5A6664] truncate">{s.subtitle}</p>
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                {originPlace && (
+                  <p className="text-xs text-[#123D3A] font-medium flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
+                    <span className="truncate">
+                      Coordinates locked ({originPlace.lat.toFixed(4)}, {originPlace.lng.toFixed(4)}) ·{' '}
+                      {originPlace.source || 'Verified'}
+                    </span>
+                  </p>
+                )}
+
+                {/* FROM Suggestions Dropdown */}
+                {originOpen && (
+                  <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 rounded-2xl bg-white border border-[#D7CFC1] shadow-[0_20px_44px_-12px_rgba(18,61,58,0.28)] max-h-72 overflow-y-auto">
+                    {originSearching ? (
+                      <div className="p-4 flex items-center gap-2 text-sm text-[#495553]">
+                        <Loader2 className="w-4 h-4 animate-spin text-[#123D3A]" />
+                        <span>Searching stations, landmarks & Google Places...</span>
                       </div>
+                    ) : originSuggestions.length === 0 ? (
+                      <div className="p-4 text-sm text-[#5A6664]">
+                        No matching places found yet. Try typing a city, station name (e.g., Katra, Puri, Varanasi, Jaipur), or temple name.
+                      </div>
+                    ) : (
+                      <ul role="listbox" aria-label="Starting point suggestions" className="divide-y divide-[#F0ECE1]">
+                        {originSuggestions.map((item) => (
+                          <li key={`${item.source}-${item.id}`}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const place = suggestionToPlace(item);
+                                setOriginPlace(place);
+                                setOriginQuery(place.label);
+                                setOriginOpen(false);
+                                setPlannerError(null);
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-[#F8F6F0] transition-colors flex items-start justify-between gap-3"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-[#142322]">{item.label}</p>
+                                <p className="text-xs text-[#5A6664] mt-0.5">{item.subtitle}</p>
+                              </div>
+                              <span className="shrink-0 text-[11px] font-mono px-2 py-0.5 rounded bg-[#F3EFE6] text-[#123D3A]">
+                                {item.source}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
                 )}
-
-                <Link
-                  to="/explore"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-full bg-white border border-[#D8D0C0] text-sm font-semibold text-[#142322] hover:border-[#123D3A] hover:bg-[#F3EFE6] transition-colors"
-                >
-                  <span>View More Destinations</span>
-                  <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                </Link>
               </div>
-            </div>
 
-            {/* Search & Category Filter Bar */}
-            {!discoverLoading && attractions.length > 0 && (
-              <div className="bg-white rounded-2xl border border-[#E5DFD3] p-4 space-y-3 shadow-2xs">
-                <div className="flex flex-col md:flex-row gap-3 justify-between">
-                  <div className="relative flex-1 max-w-md">
-                    <Search className="w-4 h-4 text-[#5A6664] absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
-                    <input
-                      type="text"
-                      value={attractionSearch}
-                      onChange={(e) => setAttractionSearch(e.target.value)}
-                      placeholder="Filter temples, beaches, cafes, adventures..."
-                      aria-label="Filter discovered attractions"
-                      className="w-full h-11 pl-10 pr-4 rounded-xl border border-[#D8D0C0] bg-[#F8F6F0] text-sm text-[#142322] placeholder:text-[#78827F] focus:outline-none focus:border-[#123D3A]"
-                    />
-                  </div>
-                  <p className="text-sm text-[#495553] self-center">
-                    Showing <strong className="font-mono text-[#123D3A]">{filteredAttractions.length}</strong> of{' '}
-                    <span className="font-mono">{attractions.length}</span> places within 75 km
-                  </p>
+              {/* SWAP BUTTON */}
+              <div className="flex lg:flex-col items-center justify-center lg:pt-14">
+                <button
+                  type="button"
+                  onClick={handleSwap}
+                  data-swapped={swappedCount % 2 === 1 ? 'true' : 'false'}
+                  aria-label="Swap starting point and destination"
+                  title="Swap From & To"
+                  className="ys-swap-btn w-11 h-11 rounded-full bg-[#F5F1E8] border border-[#D7CFC1] hover:border-[#123D3A] text-[#123D3A] flex items-center justify-center shadow-2xs"
+                >
+                  <ArrowUpDown className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </div>
+
+              {/* TO LOCATION */}
+              <div ref={destWrapRef} className="relative space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <label
+                    htmlFor="smart-hop-to"
+                    className="text-xs font-mono font-bold uppercase tracking-[0.08em] text-[#123D3A]"
+                  >
+                    TO · DESTINATION
+                  </label>
+                  <span className="text-xs text-[#5A6664]">Temples, Beaches, Markets & Hubs</span>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {(['All', ...CATEGORY_ORDER] as const).map((cat) => {
-                    const active = activeCategoryFilter === cat;
+                {/* TO category pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                  {TO_CATEGORIES.map((cat) => {
+                    const active = destKind === cat.kind;
                     return (
                       <button
-                        key={cat}
+                        key={cat.kind}
                         type="button"
-                        onClick={() => setActiveCategoryFilter(cat)}
-                        className={`px-3.5 py-2 min-h-[40px] rounded-xl text-sm font-semibold border transition-colors cursor-pointer ${
+                        onClick={() => {
+                          setDestKind(cat.kind);
+                          setDestOpen(true);
+                        }}
+                        className={`ys-chip shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium border ${
                           active
                             ? 'bg-[#123D3A] text-white border-[#123D3A]'
-                            : 'bg-[#F8F6F0] text-[#142322] border-[#E5DFD3] hover:border-[#123D3A]/40'
+                            : 'bg-[#FAF8F3] text-[#495553] border-[#E5DFD3] hover:border-[#123D3A]/40'
                         }`}
                       >
-                        {cat === 'All' ? 'All Categories' : cat}
+                        {cat.label}
                       </button>
                     );
                   })}
                 </div>
-              </div>
-            )}
 
-            {discoverLoading && (
-              <div className="space-y-4">
-                <p className="text-sm font-medium text-[#495553]">
-                  Discovering landmarks, beaches, cafes, and adventure experiences across {destinationCityHeading}…
-                </p>
-                <DiscoverySkeleton count={3} />
-              </div>
-            )}
+                <div className="relative">
+                  <Search
+                    className="w-4 h-4 text-[#E9A34A] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                    aria-hidden="true"
+                  />
+                  <input
+                    id="smart-hop-to"
+                    type="text"
+                    value={destQuery}
+                    onFocus={() => setDestOpen(true)}
+                    onChange={(e) => {
+                      setDestQuery(e.target.value);
+                      setDestPlace(null);
+                      setDestOpen(true);
+                      setPlannerError(null);
+                    }}
+                    placeholder="e.g., Jagannath Temple, Banganga Deodi, Kashi Vishwanath..."
+                    autoComplete="off"
+                    className="ys-input w-full pl-10 pr-10 py-3.5 min-h-[50px] rounded-xl bg-[#FAF8F3] border border-[#D7CFC1] text-base text-[#142322] placeholder:text-[#6B7775] focus:bg-white focus:outline-none"
+                  />
+                  {destQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDestQuery('');
+                        setDestPlace(null);
+                        setDestOpen(true);
+                      }}
+                      aria-label="Clear destination"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-[#5A6664] hover:text-[#142322] hover:bg-[#EFECE3]"
+                    >
+                      <X className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
 
-            {discoverError && !discoverLoading && (
-              <div className="rounded-2xl bg-amber-50 border border-amber-200 p-5 text-sm text-amber-900">
-                {discoverError}
-              </div>
-            )}
+                {destPlace && (
+                  <p className="text-xs text-[#123D3A] font-medium flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
+                    <span className="truncate">
+                      Coordinates locked ({destPlace.lat.toFixed(4)}, {destPlace.lng.toFixed(4)}) ·{' '}
+                      {destPlace.source || 'Verified'}
+                    </span>
+                  </p>
+                )}
 
-            {!discoverLoading && filteredAttractions.length === 0 && attractions.length > 0 && (
-              <div className="bg-white rounded-2xl border border-[#E5DFD3] p-8 text-center space-y-3">
-                <p className="text-base font-medium text-[#142322]">
-                  No places matched &ldquo;{attractionSearch}&rdquo;.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAttractionSearch('');
-                    setActiveCategoryFilter('All');
-                  }}
-                  className="px-4 py-2.5 rounded-xl bg-[#123D3A] text-white text-sm font-medium cursor-pointer"
-                >
-                  Reset Filters
-                </button>
-              </div>
-            )}
-
-            {/* Grouped Horizontal Sliding Category Carousels (including Cafe Corner & Adventure & Experiences) */}
-            {!discoverLoading && filteredAttractions.length > 0 && (
-              <div className="space-y-10">
-                {CATEGORY_ORDER.map((category) => {
-                  const list = groupedCarousels[category];
-                  if (!list || list.length === 0) return null;
-                  return (
-                    <DestinationCarousel
-                      key={category}
-                      title={category}
-                      subtitle={CATEGORY_SUBTITLES[category]}
-                      attractions={list}
-                      selectedAttractionId={selectedHeroAttraction?.id || null}
-                      pickupLabel={pickupPlace?.label || destPlace?.label || 'your pickup'}
-                      onPreviewAttraction={handlePreviewAttractionInHero}
-                      onOpenDetailCard={handleOpenAttractionOverlay}
-                      onSelectAttraction={handleSelectAttraction}
-                    />
-                  );
-                })}
-
-                {/* Complete Regional Directory Grid with Load More */}
-                {filteredAttractions.length > 8 && (
-                  <div className="pt-6 border-t border-[#E5DFD3] space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <h3 className="font-serif text-xl sm:text-2xl font-semibold text-[#142322]">
-                        All Discovered Regional Spots ({filteredAttractions.length})
-                      </h3>
-                      {filteredAttractions.length > visibleGridLimit && (
-                        <button
-                          type="button"
-                          onClick={() => setVisibleGridLimit((n) => n + 12)}
-                          className="px-4 py-2.5 rounded-xl bg-white border border-[#D8D0C0] text-sm font-semibold text-[#123D3A] hover:bg-[#F3EFE6] self-start cursor-pointer"
-                        >
-                          Load More ({filteredAttractions.length - visibleGridLimit} remaining)
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredAttractions.slice(0, visibleGridLimit).map((item) => {
-                        const isSelectedSpot = item.id === selectedHeroAttraction?.id;
-                        return (
-                          <div
-                            key={`dir-${item.id}`}
-                            onMouseEnter={() => preloadHeroImage(item.image)}
-                            className={`bg-white rounded-xl border p-4 flex items-center justify-between gap-3 transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                              isSelectedSpot
-                                ? 'border-[#123D3A] ring-2 ring-[#E9A34A]/60 shadow-sm'
-                                : 'border-[#E5DFD3] hover:border-[#123D3A]/45'
-                            }`}
-                          >
+                {/* TO Suggestions Dropdown */}
+                {destOpen && (
+                  <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 rounded-2xl bg-white border border-[#D7CFC1] shadow-[0_20px_44px_-12px_rgba(18,61,58,0.28)] max-h-72 overflow-y-auto">
+                    {destSearching ? (
+                      <div className="p-4 flex items-center gap-2 text-sm text-[#495553]">
+                        <Loader2 className="w-4 h-4 animate-spin text-[#123D3A]" />
+                        <span>Searching curated attractions & Google Places...</span>
+                      </div>
+                    ) : destSuggestions.length === 0 ? (
+                      <div className="p-4 text-sm text-[#5A6664]">
+                        No matching destination found yet. Enter a known temple, beach, monument, or street address.
+                      </div>
+                    ) : (
+                      <ul role="listbox" aria-label="Destination suggestions" className="divide-y divide-[#F0ECE1]">
+                        {destSuggestions.map((item) => (
+                          <li key={`${item.source}-${item.id}`}>
                             <button
                               type="button"
-                              onClick={() => handleOpenAttractionOverlay(item)}
-                              className="min-w-0 text-left flex-1 cursor-pointer focus:outline-none"
+                              onClick={() => {
+                                const place = suggestionToPlace(item);
+                                setDestPlace(place);
+                                setDestQuery(place.label);
+                                setDestOpen(false);
+                                setPlannerError(null);
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-[#F8F6F0] transition-colors flex items-start justify-between gap-3"
                             >
-                              <p className="eyebrow-mono font-bold text-[#123D3A]">
-                                {item.category} · {item.distanceFromPickupKm} km
-                              </p>
-                              <p className="font-semibold text-[15px] text-[#142322] truncate mt-0.5 hover:text-[#123D3A]">
-                                {item.name}
-                              </p>
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-[#142322]">{item.label}</p>
+                                <p className="text-xs text-[#5A6664] mt-0.5">{item.subtitle}</p>
+                              </div>
+                              <span className="shrink-0 text-[11px] font-mono px-2 py-0.5 rounded bg-[#F3EFE6] text-[#123D3A]">
+                                {item.source}
+                              </span>
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => handleSelectAttraction(item)}
-                              className="shrink-0 px-3.5 py-2.5 min-h-[40px] rounded-lg bg-[#F3EFE6] hover:bg-[#123D3A] hover:text-white text-sm font-semibold text-[#123D3A] transition-colors cursor-pointer"
-                            >
-                              Compare Rides
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </section>
-        )}
-
-        {/* Helpful Ground-Level Onboarding Note if user hasn't searched yet */}
-        {attractions.length === 0 && !discoverLoading && (
-          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-            <div className="bg-white rounded-3xl border border-[#E5DFD3] p-6 sm:p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[#F3EFE6] text-[#123D3A]">
-                  <Train className="w-5 h-5" aria-hidden="true" />
-                </span>
-                <h3 className="font-serif text-xl font-semibold text-[#142322]">
-                  All-India Transit Intelligence
-                </h3>
-                <p className="text-sm text-[#495553] leading-relaxed">
-                  Covers all 28 States &amp; 8 Union Territories with strict filtering between railway stations, bus stands, airports, temples, and hotels.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[#F3EFE6] text-[#123D3A]">
-                  <Compass className="w-5 h-5 text-[#E9A34A]" aria-hidden="true" />
-                </span>
-                <h3 className="font-serif text-xl font-semibold text-[#142322]">
-                  OSRM Route &amp; Provider Cards
-                </h3>
-                <p className="text-sm text-[#495553] leading-relaxed">
-                  Every distance, duration, and route polyline is computed from road network routing, paired with transparent per-km and base-fare cards.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[#F3EFE6] text-[#123D3A]">
-                  <Navigation className="w-5 h-5" aria-hidden="true" />
-                </span>
-                <h3 className="font-serif text-xl font-semibold text-[#142322]">
-                  Local Spots, Cafes &amp; Adventures
-                </h3>
-                <p className="text-sm text-[#495553] leading-relaxed">
-                  Once your arrival route is ready, browse nearby attractions, Cafe Corner, and Adventure experiences and compare rides to any stop.
-                </p>
-              </div>
             </div>
-          </section>
-        )}
+
+            {plannerError && (
+              <div
+                role="alert"
+                className="rounded-xl bg-amber-50 border border-amber-300 px-4 py-3 text-sm text-amber-950 flex items-start gap-2.5"
+              >
+                <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
+                <span>{plannerError}</span>
+              </div>
+            )}
+
+            {/* Quick sample jumps + primary CTA */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pt-1 border-t border-[#F0ECE1]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-mono uppercase tracking-[0.06em] text-[#5A6664]">
+                  Popular Indian Hops:
+                </span>
+                {QUICK_SAMPLE_ROUTES.map((sample) => (
+                  <button
+                    key={sample.label}
+                    type="button"
+                    onClick={() => handleSelectQuickSample(sample)}
+                    disabled={routeLoading}
+                    className="ys-chip px-2.5 py-1.5 rounded-lg bg-[#F5F1E8] border border-[#E2DAC9] hover:border-[#123D3A]/45 text-xs font-medium text-[#123D3A]"
+                  >
+                    {sample.label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="submit"
+                disabled={routeLoading}
+                className="ys-btn-primary inline-flex items-center justify-center gap-2.5 px-7 py-3.5 min-h-[50px] rounded-xl bg-[#E9A34A] text-[#142322] text-base font-bold shadow-sm hover:bg-[#DF9538] disabled:opacity-65 shrink-0"
+              >
+                {routeLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                    <span>Calculating Road Route...</span>
+                  </>
+                ) : (
+                  <>
+                    <Navigation className="w-5 h-5" aria-hidden="true" />
+                    <span>Explore Journey</span>
+                    <ArrowRight className="w-4 h-4 ys-arrow" aria-hidden="true" />
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* Resolved Shared Journey Context Bar */}
+          {sharedJourney && (
+            <div className="mt-6 rounded-2xl bg-[#123D3A] text-white p-5 space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="space-y-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-mono uppercase tracking-[0.08em] text-[#8CC9E8]">
+                    <span>Shared Route Context Ready</span>
+                    <span>·</span>
+                    <span>{sharedJourney.isTrafficAware ? 'Live Traffic-Aware' : 'Road Estimate (No Live Traffic)'}</span>
+                  </div>
+                  <p className="text-base sm:text-lg font-semibold leading-snug">
+                    {sharedJourney.origin.label}{' '}
+                    <span className="text-[#E9A34A] mx-1">→</span>{' '}
+                    {sharedJourney.destination.label}
+                  </p>
+                  <p className="text-xs text-white/75">{sharedJourney.trafficSourceLabel}</p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 shrink-0">
+                  <div className="rounded-xl bg-white/10 border border-white/15 px-3.5 py-2">
+                    <p className="text-[11px] font-mono uppercase text-[#8CC9E8]">Distance</p>
+                    <p className="text-lg font-bold font-mono tabular-figures">
+                      {sharedJourney.distanceKm} km
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-white/10 border border-white/15 px-3.5 py-2">
+                    <p className="text-[11px] font-mono uppercase text-[#8CC9E8]">Est. Time</p>
+                    <p className="text-lg font-bold font-mono tabular-figures">
+                      ~{activeDuration} min
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowRouteMap((v) => !v)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] rounded-xl bg-white/12 hover:bg-white/20 border border-white/25 text-sm font-semibold transition-colors"
+                  >
+                    <MapIcon className="w-4 h-4 text-[#E9A34A]" aria-hidden="true" />
+                    <span>{showRouteMap ? 'Hide Map' : 'Preview Map'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {showRouteMap && (
+                <div className="rounded-xl overflow-hidden border border-white/15 bg-[#F8F6F0]">
+                  <GoogleRouteMap
+                    heightClass="h-[300px]"
+                    routeGeometry={sharedJourney.routeGeometry}
+                    stops={[
+                      {
+                        id: 'origin',
+                        label: sharedJourney.origin.label,
+                        lat: sharedJourney.origin.lat,
+                        lng: sharedJourney.origin.lng,
+                        kind: 'origin',
+                      },
+                      {
+                        id: 'dest',
+                        label: sharedJourney.destination.label,
+                        lat: sharedJourney.destination.lat,
+                        lng: sharedJourney.destination.lng,
+                        kind: 'destination',
+                      },
+                    ]}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* Exactly Three Smart Local Hop Feature Cards */}
+        <section aria-labelledby="smart-hop-tools-heading" className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+            <div>
+              <p className="eyebrow-mono font-semibold text-[#123D3A]">
+                THREE GROUND-LEVEL TOOLS · OPENS IN A NEW TAB
+              </p>
+              <h2
+                id="smart-hop-tools-heading"
+                className="font-editorial text-2xl sm:text-3xl font-semibold text-[#142322] mt-1"
+              >
+                Inspect your journey intelligence
+              </h2>
+            </div>
+            <p className="text-sm text-[#5A6664]">
+              {sharedJourney
+                ? 'Your active route transfers automatically into whichever tool tab you open.'
+                : 'Calculate a route above first, then open any tool below.'}
+            </p>
+          </div>
+
+          <RevealGroup
+            immediate
+            staggerMs={STAGGER_CARDS_MS}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
+            {featureCards.map((card, idx) => {
+              const Icon = card.icon;
+              const isPopupBlockedForThis = popupFallback?.cardId === card.id;
+              return (
+                <RevealItem key={card.id} index={idx} className="h-full">
+                  <MotionCard className="h-full rounded-2xl bg-white border border-[#DFD8C8] overflow-hidden flex flex-col justify-between shadow-xs">
+                    <div>
+                      {/* Clean Card Photography (separate from text container below) */}
+                      <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#123D3A]">
+                        <SafeImage
+                          src={card.image}
+                          alt={card.imageAlt}
+                          className="ys-card-img w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0D1A18]/80 via-[#0D1A18]/20 to-transparent pointer-events-none" />
+                        <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between">
+                          <span className="px-2.5 py-1 rounded-lg bg-[#0D1A18]/75 backdrop-blur-sm text-xs font-mono font-semibold text-[#E9A34A] border border-white/15">
+                            FEATURE {card.num}
+                          </span>
+                          <span className="w-9 h-9 rounded-xl bg-white/95 text-[#123D3A] flex items-center justify-center shadow-sm ys-icon-float">
+                            <Icon className="w-4 h-4" aria-hidden="true" />
+                          </span>
+                        </div>
+                        {card.id === 'fare' && (
+                          <span className="absolute bottom-3 left-3.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/95 text-[#123D3A] text-xs font-semibold shadow-sm">
+                            <Volume2 className="w-3.5 h-3.5 text-[#E9A34A]" aria-hidden="true" />
+                            <span>Local Voice Pass</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Card Body */}
+                      <div className="p-5 sm:p-6 space-y-3">
+                        <h3 className="font-editorial text-xl sm:text-2xl font-semibold text-[#142322] leading-snug">
+                          {card.title}
+                        </h3>
+                        <p className="text-sm text-[#495553] leading-relaxed">{card.subtitle}</p>
+
+                        <div className="rounded-xl bg-[#F8F6F0] border border-[#E5DFD3] px-3.5 py-2.5 text-xs font-medium text-[#123D3A]">
+                          {card.liveSummary}
+                        </div>
+
+                        <ul className="space-y-1.5 pt-1">
+                          {card.highlights.map((item) => (
+                            <li
+                              key={item}
+                              className="flex items-center gap-2 text-xs font-medium text-[#394543]"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#E9A34A] shrink-0" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* Main CTA Footer */}
+                    <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-2 space-y-2.5">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenFeatureTab(card.id)}
+                        className={`ys-btn-primary w-full inline-flex items-center justify-center gap-2 px-4 py-3 min-h-[46px] rounded-xl text-sm font-bold transition-colors ${
+                          sharedJourney
+                            ? 'bg-[#123D3A] text-white hover:bg-[#194E4A]'
+                            : 'bg-[#E9A34A] text-[#142322] hover:bg-[#DF9538]'
+                        }`}
+                      >
+                        <span>{card.ctaLabel}</span>
+                        <ExternalLink className="w-4 h-4 ys-arrow" aria-hidden="true" />
+                      </button>
+
+                      {isPopupBlockedForThis && (
+                        <div className="rounded-xl bg-amber-50 border border-amber-300 p-3 text-xs text-amber-950 space-y-2">
+                          <p className="font-medium">
+                            Your browser blocked opening a new tab automatically. Use the direct link below:
+                          </p>
+                          <a
+                            href={popupFallback.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => setPopupFallback(null)}
+                            className="inline-flex items-center gap-1.5 font-bold underline text-[#123D3A]"
+                          >
+                            <span>Open in New Tab Now</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </MotionCard>
+                </RevealItem>
+              );
+            })}
+          </RevealGroup>
+        </section>
       </main>
 
       <Footer />

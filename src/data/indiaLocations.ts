@@ -21,6 +21,36 @@ export interface IndianTransitHub {
   groundTip?: string;
 }
 
+export type CuratedLandmarkCategory =
+  | 'Popular Places'
+  | 'Temples & Heritage'
+  | 'Nature & Beaches'
+  | 'Cafe Corner'
+  | 'Adventure & Experiences'
+  | 'Museums & Culture'
+  | 'Hidden Gems';
+
+export interface IndianCuratedLandmark {
+  id: string;
+  name: string;
+  aliases?: string[];
+  placeType: string;
+  discoverCategory: CuratedLandmarkCategory;
+  city: string;
+  state: string;
+  lat: number;
+  lng: number;
+  shortDescription: string;
+  bestVisitingTime: string;
+  groundTip?: string;
+  openingHoursText?: string;
+  openingHoursVerified?: boolean;
+  typicalOpenHour24?: number;
+  typicalCloseHour24?: number;
+  recommendedWalkMinutes?: number;
+  recommendedActivityMinutes?: number;
+}
+
 export interface CityCoverageProfile {
   tier: 'metro-full' | 'regional-partial' | 'local-only' | 'unknown';
   cityLabel: string;
@@ -352,7 +382,450 @@ export const INDIAN_TRANSIT_HUBS: IndianTransitHub[] = [
   { id: 'hub-pnbe-rail', name: 'Patna Junction Railway Station', stationCode: 'PNBE', type: 'Railway Station', city: 'Patna', state: 'Bihar', lat: 25.6032, lng: 85.1370 },
   { id: 'hub-sxr-air', name: 'Sheikh ul-Alam International Airport, Srinagar', stationCode: 'SXR', type: 'Airport', city: 'Srinagar', state: 'Jammu and Kashmir', lat: 33.9871, lng: 74.7742 },
   { id: 'hub-ixl-air', name: 'Kushok Bakula Rimpochee Airport, Leh', stationCode: 'IXL', type: 'Airport', city: 'Leh', state: 'Ladakh', lat: 34.1359, lng: 77.5465 },
+
+  // Jammu, Katra & Vaishno Devi Sector (Jammu and Kashmir)
+  {
+    id: 'hub-svdk-rail',
+    name: 'Shri Mata Vaishno Devi Katra Railway Station',
+    stationCode: 'SVDK',
+    type: 'Railway Station',
+    city: 'Katra',
+    state: 'Jammu and Kashmir',
+    lat: 32.9813,
+    lng: 74.9498,
+    groundTip: 'Official auto and taxi stands operate right outside Station Gate 1; Banganga Darshani Deodi yatra gate is ~2.5 km uphill.',
+  },
+  {
+    id: 'hub-katra-bus',
+    name: 'Katra Bus Stand (Main Chowk)',
+    stationCode: 'KTR-BUS',
+    type: 'Bus Stand',
+    city: 'Katra',
+    state: 'Jammu and Kashmir',
+    lat: 32.9916,
+    lng: 74.9318,
+    groundTip: 'Direct JKRTC buses and shared cabs link Katra Bus Stand with Jammu (~48 km); Banganga trailhead lies 1.4 km north.',
+  },
+  {
+    id: 'hub-jat-rail',
+    name: 'Jammu Tawi Railway Station',
+    stationCode: 'JAT',
+    type: 'Railway Station',
+    city: 'Jammu',
+    state: 'Jammu and Kashmir',
+    lat: 32.7072,
+    lng: 74.8808,
+    groundTip: 'Prepaid auto and taxi counters operate outside Exit 1; regular buses and cabs toward Katra / Raghunath Bazaar depart from Station Chowk.',
+  },
+  {
+    id: 'hub-ixj-air',
+    name: 'Jammu Airport (Satwari)',
+    stationCode: 'IXJ',
+    type: 'Airport',
+    city: 'Jammu',
+    state: 'Jammu and Kashmir',
+    lat: 32.6891,
+    lng: 74.8374,
+    groundTip: '7 km south of old Jammu and ~50 km from Katra via NH44/Domel; prepaid airport taxi counter sits outside Arrivals.',
+  },
+  {
+    id: 'hub-jammu-bus',
+    name: 'Jammu General Bus Stand (BC Road)',
+    stationCode: 'JAT-BUS',
+    type: 'Bus Stand',
+    city: 'Jammu',
+    state: 'Jammu and Kashmir',
+    lat: 32.7347,
+    lng: 74.8648,
+    groundTip: 'Central multi-level terminal near Raghunath Temple with frequent Katra, Udhampur, Patnitop, and Srinagar buses.',
+  },
 ];
+
+// Extensible India curated landmark registry for corridors where shrine paths,
+// hillside stops, or regional landmarks need reliable search & attraction discovery.
+export const INDIAN_CURATED_LANDMARKS: IndianCuratedLandmark[] = [
+  // Katra & Shri Mata Vaishno Devi Corridor
+  {
+    id: 'curated-vaishno-devi-bhawan',
+    name: 'Shri Mata Vaishno Devi Bhawan',
+    aliases: ['Vaishno Devi', 'Mata Vaishno Devi', 'Vaishno Devi Mandir', 'Bhawan', 'SMVD Bhawan'],
+    placeType: 'Sacred Cave Shrine',
+    discoverCategory: 'Temples & Heritage',
+    city: 'Katra',
+    state: 'Jammu and Kashmir',
+    lat: 33.0308,
+    lng: 74.949,
+    shortDescription:
+      'Revered Trikuta Hills cave shrine at 5,200 ft above sea level. Motor vehicles terminate at Banganga or Tarakote in Katra, followed by the 12 km yatra track or helicopter to Sanjichhat.',
+    bestVisitingTime: 'Open 24 hours · early morning or night darshan',
+    groundTip: 'Carry an official Shrine Board RFID Yatra Access Card obtained near Katra Station, Bus Stand, or Tarakote.',
+  },
+  {
+    id: 'curated-katra-banganga',
+    name: 'Banganga Darshani Deodi (Vaishno Devi Yatra Gate)',
+    aliases: ['Banganga', 'Darshani Deodi', 'Banganga Check Post'],
+    placeType: 'Pilgrimage Trailhead',
+    discoverCategory: 'Temples & Heritage',
+    city: 'Katra',
+    state: 'Jammu and Kashmir',
+    lat: 32.9977,
+    lng: 74.9347,
+    shortDescription:
+      'Primary road drop-off point and sacred riverside entry gate at the foot of the Trikuta Hills where the traditional foot climb toward Vaishno Devi begins.',
+    bestVisitingTime: 'All day · lively dawn and dusk',
+    groundTip: 'Autos and cabs from Katra Station (SVDK) drop passengers directly at the Banganga vehicle barrier.',
+  },
+  {
+    id: 'curated-katra-ardhkuwari',
+    name: 'Ardhkuwari Temple (Garbh Joon Cave)',
+    aliases: ['Ardhkuwari', 'Adhkuwari', 'Ardh Kuwari', 'Garbh Joon'],
+    placeType: 'Pilgrimage Stop',
+    discoverCategory: 'Temples & Heritage',
+    city: 'Katra',
+    state: 'Jammu and Kashmir',
+    lat: 33.0145,
+    lng: 74.9462,
+    shortDescription:
+      'Midway sacred stop ~6 km up from Banganga, featuring the narrow Garbh Joon cave shrine and the junction connecting to the battery-car road to Bhawan.',
+    bestVisitingTime: 'Early morning · queue tokens issued on arrival',
+  },
+  {
+    id: 'curated-katra-sanjichhat',
+    name: 'Sanjichhat Ridge & Helipad',
+    aliases: ['Sanjichhat', 'Sanji Chhat', 'Sanjichhat Helipad'],
+    placeType: 'Mountain Ridge & Helipad',
+    discoverCategory: 'Adventure & Experiences',
+    city: 'Katra',
+    state: 'Jammu and Kashmir',
+    lat: 33.0258,
+    lng: 74.9436,
+    shortDescription:
+      'High ridge at ~6,200 ft ~9.5 km above Katra with panoramic Pir Panjal views, Shrine Board accommodation, and the helipad serving Katra–Sanjichhat shuttles.',
+    bestVisitingTime: 'Sunrise & clear mornings',
+  },
+  {
+    id: 'curated-katra-bhairon-temple',
+    name: 'Bhairon Temple (Bhairavnath Mandir)',
+    aliases: ['Bhairon Temple', 'Bhairon Baba', 'Bhairavnath'],
+    placeType: 'Hilltop Temple',
+    discoverCategory: 'Temples & Heritage',
+    city: 'Katra',
+    state: 'Jammu and Kashmir',
+    lat: 33.0338,
+    lng: 74.9547,
+    shortDescription:
+      'Hilltop shrine 1.5 km above Bhawan reached via a short steep trail or the passenger ropeway, traditionally visited to complete the Vaishno Devi yatra.',
+    bestVisitingTime: 'Morning to afternoon · ropeway closes near dusk',
+  },
+  {
+    id: 'curated-katra-tarakote',
+    name: 'Tarakote Marg Trailhead, Katra',
+    aliases: ['Tarakote', 'Tarakote Marg', 'Tarakote Track'],
+    placeType: 'Scenic Pilgrimage Track',
+    discoverCategory: 'Nature & Beaches',
+    city: 'Katra',
+    state: 'Jammu and Kashmir',
+    lat: 32.9998,
+    lng: 74.9288,
+    shortDescription:
+      'Wide, landscaped pedestrian-only approach path ~7 km up to Ardhkuwari with rest shelters, langar stops, and mountain views—free of ponies.',
+    bestVisitingTime: 'Morning or late afternoon',
+  },
+  {
+    id: 'curated-katra-nau-devi',
+    name: 'Nau Devi Cave Temple, Katra',
+    aliases: ['Nau Devi', 'Nau Devian'],
+    placeType: 'Cave Temple',
+    discoverCategory: 'Hidden Gems',
+    city: 'Katra',
+    state: 'Jammu and Kashmir',
+    lat: 33.0195,
+    lng: 74.9718,
+    shortDescription:
+      'Quiet hillside cave shrine ~10 km east of Katra reached along a winding mountain road near a seasonal stream.',
+    bestVisitingTime: 'Morning hours',
+  },
+
+  // Jammu City Landmarks
+  {
+    id: 'curated-jammu-raghunath-temple',
+    name: 'Raghunath Temple, Jammu',
+    aliases: ['Raghunath Temple', 'Raghunath Mandir', 'Raghunath Bazaar'],
+    placeType: 'Historic Temple Complex',
+    discoverCategory: 'Temples & Heritage',
+    city: 'Jammu',
+    state: 'Jammu and Kashmir',
+    lat: 32.733,
+    lng: 74.8673,
+    shortDescription:
+      '19th-century Dogra-era seven-shrine temple complex in central Jammu overlooking the bustling Raghunath Bazaar.',
+    bestVisitingTime: '6:00 AM – 12:00 PM & evening aarti',
+  },
+  {
+    id: 'curated-jammu-bahu-fort',
+    name: 'Bahu Fort & Bawe Wali Mata Temple',
+    aliases: ['Bahu Fort', 'Bawe Wali Mata'],
+    placeType: 'Historic Hilltop Fort',
+    discoverCategory: 'Temples & Heritage',
+    city: 'Jammu',
+    state: 'Jammu and Kashmir',
+    lat: 32.7248,
+    lng: 74.8797,
+    shortDescription:
+      'Ancient fort perched above the left bank of the Tawi River housing the revered Bawe Wali Mata shrine and wide city rampart views.',
+    bestVisitingTime: 'Morning or sunset',
+  },
+  {
+    id: 'curated-jammu-bagh-e-bahu',
+    name: 'Bagh-e-Bahu Gardens & Aquarium',
+    aliases: ['Bagh-e-Bahu', 'Bagh e Bahu', 'Bahu Garden'],
+    placeType: 'Terraced Park & Garden',
+    discoverCategory: 'Nature & Beaches',
+    city: 'Jammu',
+    state: 'Jammu and Kashmir',
+    lat: 32.7232,
+    lng: 74.8825,
+    shortDescription:
+      'Terraced hillside Mughal-style gardens overlooking the Tawi River beside Bahu Fort, paired with an underground freshwater aquarium.',
+    bestVisitingTime: '4:00 PM – 7:00 PM',
+  },
+  {
+    id: 'curated-jammu-amar-mahal',
+    name: 'Amar Mahal Palace Museum, Jammu',
+    aliases: ['Amar Mahal', 'Amar Mahal Palace'],
+    placeType: 'Palace Museum',
+    discoverCategory: 'Museums & Culture',
+    city: 'Jammu',
+    state: 'Jammu and Kashmir',
+    lat: 32.7438,
+    lng: 74.8726,
+    shortDescription:
+      'Red-sandstone French-chateau-inspired Dogra palace overlooking the Tawi bend, exhibiting miniature Pahari paintings and royal archives.',
+    bestVisitingTime: '10:00 AM – 5:00 PM (check Monday closure)',
+  },
+  {
+    id: 'curated-jammu-mubarak-mandi',
+    name: 'Mubarak Mandi Heritage Complex, Jammu',
+    aliases: ['Mubarak Mandi', 'Mubarak Mandi Palace'],
+    placeType: 'Heritage Palace Courtyard',
+    discoverCategory: 'Museums & Culture',
+    city: 'Jammu',
+    state: 'Jammu and Kashmir',
+    lat: 32.7351,
+    lng: 74.8698,
+    shortDescription:
+      'Historic 18th–19th century royal courtyard complex of Dogra rulers blending Rajasthani, Mughal, and European arcades in old Jammu.',
+    bestVisitingTime: 'Daylight hours',
+  },
+  {
+    id: 'curated-jammu-mansar-lake',
+    name: 'Mansar Lake',
+    aliases: ['Mansar', 'Mansar Lake'],
+    placeType: 'Sacred Foothill Lake',
+    discoverCategory: 'Nature & Beaches',
+    city: 'Jammu',
+    state: 'Jammu and Kashmir',
+    lat: 32.6968,
+    lng: 75.1462,
+    shortDescription:
+      'Forest-ringed oval lake ~62 km east of Jammu city popular for lakeside walks, temple shrines, and peaceful foothill excursions.',
+    bestVisitingTime: 'Morning to late afternoon',
+  },
+
+  // Puri Corridor (Odisha)
+  {
+    id: 'curated-puri-jagannath-temple',
+    name: 'Shri Jagannath Temple, Puri',
+    aliases: ['Jagannath Temple', 'Shree Jagannath Temple', 'Puri Temple', 'Jagannath Mandir'],
+    placeType: 'Sacred Temple Complex',
+    discoverCategory: 'Temples & Heritage',
+    city: 'Puri',
+    state: 'Odisha',
+    lat: 19.8049,
+    lng: 85.8179,
+    shortDescription:
+      '12th-century Kalinga sandstone temple on Grand Road (Bada Danda). Phones, cameras, and leather items are not allowed inside the sanctum; deposit counters sit outside Singhadwara.',
+    bestVisitingTime: '5:30 AM – 8:30 AM or 6:30 PM – 8:30 PM',
+    groundTip:
+      'Autos and e-rickshaws drop near Market Chhak or the Singhadwara barricade (~250m walk to the Lion Gate shoe & phone cloakroom).',
+    openingHoursText: 'Typically 5:30 AM – 10:00 PM daily (ritual intervals may pause inner darshan)',
+    openingHoursVerified: false,
+    typicalOpenHour24: 5.5,
+    typicalCloseHour24: 22,
+    recommendedWalkMinutes: 10,
+    recommendedActivityMinutes: 90,
+  },
+  {
+    id: 'curated-puri-golden-beach',
+    name: 'Golden Beach (Blue Flag Seafront), Puri',
+    aliases: ['Golden Beach', 'Puri Beach', 'Puri Sea Beach', 'Blue Flag Beach Puri'],
+    placeType: 'Coastal Beachfront',
+    discoverCategory: 'Nature & Beaches',
+    city: 'Puri',
+    state: 'Odisha',
+    lat: 19.7949,
+    lng: 85.8266,
+    shortDescription:
+      'Cleaned Bay of Bengal shoreline along Marine Drive featuring paved promenade benches, lifeguard zones, and calm sunrise & sunset breezes.',
+    bestVisitingTime: '5:30 AM – 8:00 AM & 4:30 PM – 6:45 PM',
+    groundTip:
+      'Marine Drive / Chakra Tirtha Road runs parallel to the seafront; autos drop directly outside beach access gates.',
+    openingHoursText: 'Public promenade open early morning until evening (Blue Flag gates typically 6:00 AM – 8:00 PM)',
+    openingHoursVerified: false,
+    typicalOpenHour24: 6,
+    typicalCloseHour24: 20,
+    recommendedWalkMinutes: 5,
+    recommendedActivityMinutes: 60,
+  },
+
+  // Varanasi Corridor (Uttar Pradesh)
+  {
+    id: 'curated-varanasi-kashi-vishwanath',
+    name: 'Kashi Vishwanath Temple, Varanasi',
+    aliases: ['Kashi Vishwanath', 'Vishwanath Temple', 'Kashi Vishwanath Corridor'],
+    placeType: 'Sacred Jyotirlinga Shrine',
+    discoverCategory: 'Temples & Heritage',
+    city: 'Varanasi',
+    state: 'Uttar Pradesh',
+    lat: 25.3109,
+    lng: 83.0107,
+    shortDescription:
+      'Historic Shiva temple linked directly to the Ganga via the Kashi Vishwanath Corridor. Vehicles stop near Godowlia or Maidagin barricades.',
+    bestVisitingTime: '4:00 AM – 7:30 AM or after evening Aarti',
+    groundTip:
+      'Four-wheelers and regular autos cannot enter narrow lane barricades past Godowlia Chowk — expect a 450–700m pedestrian walk to the Gate 4 corridor entrance.',
+    openingHoursText: 'Typically 3:00 AM – 11:00 PM daily (closed briefly during Mangala/Bhog/Shayan Aarti rituals)',
+    openingHoursVerified: false,
+    typicalOpenHour24: 3,
+    typicalCloseHour24: 23,
+    recommendedWalkMinutes: 15,
+    recommendedActivityMinutes: 75,
+  },
+  {
+    id: 'curated-varanasi-dashashwamedh-ghat',
+    name: 'Dashashwamedh Ghat, Varanasi',
+    aliases: ['Dashashwamedh Ghat', 'Ganga Aarti Ghat', 'Godowlia'],
+    placeType: 'Historic Ganga Ghat',
+    discoverCategory: 'Temples & Heritage',
+    city: 'Varanasi',
+    state: 'Uttar Pradesh',
+    lat: 25.3069,
+    lng: 83.0104,
+    shortDescription:
+      'Central riverfront steps famous for the evening Ganga Aarti ceremony and wooden sunrise boat rides.',
+    bestVisitingTime: '5:30 AM – 7:00 AM (dawn) or 5:30 PM onwards for evening Aarti',
+    groundTip:
+      'Auto drop stops near Godowlia Chowk; walk ~500m east toward the river steps.',
+    openingHoursText: 'Open 24 hours (Evening Aarti begins around 6:00 PM – 6:45 PM depending on season)',
+    openingHoursVerified: false,
+    typicalOpenHour24: 0,
+    typicalCloseHour24: 24,
+    recommendedWalkMinutes: 12,
+    recommendedActivityMinutes: 90,
+  },
+
+  // Jaipur & Udaipur Heritage Landmarks
+  {
+    id: 'curated-jaipur-hawa-mahal',
+    name: 'Hawa Mahal, Jaipur',
+    aliases: ['Hawa Mahal', 'Palace of Winds', 'Badi Chaupar'],
+    placeType: 'Historic Monument',
+    discoverCategory: 'Temples & Heritage',
+    city: 'Jaipur',
+    state: 'Rajasthan',
+    lat: 26.9239,
+    lng: 75.8267,
+    shortDescription:
+      'Five-storey 1799 red-and-pink sandstone facade with 953 ventilated jharokhas inside the Walled City near Badi Chaupar.',
+    bestVisitingTime: '9:00 AM – 11:00 AM (front facade sunlit in morning)',
+    groundTip:
+      'Badi Chaupar Metro station sits ~250m from Hawa Mahal; inner monument entry is from the rear courtyard side lane.',
+    openingHoursText: '9:00 AM – 5:00 PM daily (verify evening night-visit hours at ticket window)',
+    openingHoursVerified: true,
+    typicalOpenHour24: 9,
+    typicalCloseHour24: 17,
+    recommendedWalkMinutes: 5,
+    recommendedActivityMinutes: 60,
+  },
+  {
+    id: 'curated-jaipur-amber-fort',
+    name: 'Amber Fort (Amer Palace), Jaipur',
+    aliases: ['Amber Fort', 'Amer Fort', 'Amer Palace'],
+    placeType: 'Hilltop Fort Palace',
+    discoverCategory: 'Temples & Heritage',
+    city: 'Jaipur',
+    state: 'Rajasthan',
+    lat: 26.9855,
+    lng: 75.8513,
+    shortDescription:
+      '16th-century hilltop Rajput citadel featuring Sheesh Mahal, Suraj Pol, and views across Maota Lake.',
+    bestVisitingTime: '8:00 AM – 10:30 AM before midday crowds',
+    groundTip:
+      'Cabs drop near the lower Suraj Pol / Jaleb Chowk ramp; electric golf carts and pedestrian ramps ascend to the main courtyard.',
+    openingHoursText: '8:00 AM – 5:30 PM daytime (check evening light-show hours separately)',
+    openingHoursVerified: true,
+    typicalOpenHour24: 8,
+    typicalCloseHour24: 17.5,
+    recommendedWalkMinutes: 12,
+    recommendedActivityMinutes: 120,
+  },
+  {
+    id: 'curated-udaipur-city-palace',
+    name: 'City Palace, Udaipur',
+    aliases: ['Udaipur City Palace', 'City Palace Museum Udaipur'],
+    placeType: 'Lakeside Royal Palace',
+    discoverCategory: 'Temples & Heritage',
+    city: 'Udaipur',
+    state: 'Rajasthan',
+    lat: 24.5764,
+    lng: 73.6835,
+    shortDescription:
+      'Mewar royal palace complex overlooking Lake Pichola with 11 interconnected courtyards and museum galleries.',
+    bestVisitingTime: '9:30 AM – 11:30 AM',
+    groundTip:
+      'Old City streets restrict four-wheelers 9 AM – 8 PM; auto-rickshaws drop right outside Badi Pol / Sheetla Mata Gate.',
+    openingHoursText: '9:30 AM – 5:30 PM daily',
+    openingHoursVerified: true,
+    typicalOpenHour24: 9.5,
+    typicalCloseHour24: 17.5,
+    recommendedWalkMinutes: 8,
+    recommendedActivityMinutes: 105,
+  },
+];
+
+export function findCuratedGroundTips(
+  originLabel = '',
+  destLabel = '',
+  city = '',
+  state = ''
+): { tips: string[]; matchedLandmark?: IndianCuratedLandmark } {
+  const hay = `${originLabel} ${destLabel} ${city} ${state}`.toLowerCase();
+  const tips: string[] = [];
+
+  for (const hub of INDIAN_TRANSIT_HUBS) {
+    if (!hub.groundTip) continue;
+    const matchName =
+      hay.includes(hub.name.toLowerCase()) ||
+      (hub.stationCode && hay.includes(hub.stationCode.toLowerCase())) ||
+      (originLabel && originLabel.toLowerCase().includes(hub.city.toLowerCase()) && hay.includes(hub.type.toLowerCase().split(' ')[0]));
+    if (matchName && !tips.includes(hub.groundTip)) {
+      tips.push(hub.groundTip);
+    }
+  }
+
+  let matchedLandmark: IndianCuratedLandmark | undefined;
+  for (const lm of INDIAN_CURATED_LANDMARKS) {
+    const names = [lm.name, ...(lm.aliases || [])].map((n) => n.toLowerCase());
+    if (names.some((n) => hay.includes(n))) {
+      matchedLandmark = lm;
+      if (lm.groundTip && !tips.includes(lm.groundTip)) {
+        tips.push(lm.groundTip);
+      }
+    }
+  }
+
+  return { tips: tips.slice(0, 4), matchedLandmark };
+}
 
 const METRO_FULL_CITIES = [
   'delhi', 'new delhi', 'noida', 'gurugram', 'gurgaon', 'faridabad', 'ghaziabad',
@@ -373,7 +846,7 @@ const REGIONAL_PARTIAL_CITIES = [
   'rishikesh', 'haridwar', 'haldwani', 'nainital',
   'alleppey', 'alappuzha', 'thrissur', 'kottayam',
   'puri', 'konark', 'mathura', 'vrindavan', 'ayodhya',
-  'aurangabad', 'shirdi', 'jammu', 'srinagar', 'shimla', 'dharamshala',
+  'aurangabad', 'shirdi', 'jammu', 'katra', 'vaishno devi', 'srinagar', 'shimla', 'dharamshala',
   'siliguri', 'darjeeling', 'gaya', 'bodh gaya', 'ujjain', 'jabalpur', 'gwalior',
 ];
 
@@ -423,18 +896,28 @@ export function evaluateCityCoverage(cityOrLabel: string, stateName = ''): CityC
     const matched = REGIONAL_PARTIAL_CITIES.find((c) => hay.includes(c)) || cityOrLabel;
     const isPuri = hay.includes('puri') || hay.includes('konark');
     const isUdaipur = hay.includes('udaipur');
+    const isKatra = hay.includes('katra') || hay.includes('vaishno') || hay.includes('banganga') || hay.includes('tarakote');
+    const isJammu = hay.includes('jammu') || hay.includes('raghunath') || hay.includes('bahu');
     return {
       tier: 'regional-partial',
       cityLabel: matched,
-      uber: isUdaipur || isPuri ? 'Supported' : 'Unknown',
-      ola: isUdaipur || isPuri ? 'Supported' : 'Unknown',
-      rapido: isUdaipur || isPuri ? 'Supported' : 'Supported',
+      uber: isUdaipur || isPuri || isJammu ? 'Supported' : 'Unknown',
+      ola: isUdaipur || isPuri || isJammu ? 'Supported' : 'Unknown',
+      rapido: isUdaipur || isPuri || isJammu ? 'Supported' : 'Supported',
       hasLocalPrepaidStand: true,
       localAutoNote: isPuri
         ? 'Puri Railway Station & Bus Stand have official prepaid auto/e-rickshaw stands; app availability varies near Grand Road—confirm inside app.'
+        : isKatra
+        ? 'Official Katra prepaid autos drop at Banganga Darshani Deodi or Tarakote Marg; roads beyond the yatra gates are pedestrian/Shrine Board controlled.'
+        : isJammu
+        ? 'Prepaid auto booths sit outside Jammu Tawi Rail Exit 1 and BC Road Bus Stand alongside app autos.'
         : 'Prepaid / union auto stands operate outside major transit exits.',
       localCabNote: isPuri
         ? 'Prepaid / tourist taxi stands operate at Puri Station alongside regional Bhubaneswar–Puri aggregator pickups.'
+        : isKatra
+        ? 'Prepaid taxis & Jammu–Katra cabs operate from SVDK Station & Katra Bus Stand up to Banganga / Helipad.'
+        : isJammu
+        ? 'Prepaid Jammu taxis & Katra sector cabs operate directly from Jammu Tawi Station and IXJ Airport.'
         : 'Regional union & prepaid taxi booths operate at main railway/bus terminals.',
     };
   }

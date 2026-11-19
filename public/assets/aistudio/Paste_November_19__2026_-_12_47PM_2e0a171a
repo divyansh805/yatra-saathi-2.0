@@ -1,0 +1,1496 @@
+# YATRA SAATHI 2.0 — COMPLETE PROJECT UPDATE
+## Landing Page Content Transformation + Complete Travel Assist Replacement
+### SMART LOCAL HOP — Ground-Level Local Travel Intelligence
+
+You are modifying my EXISTING Yatra Saathi 2.0 source code.
+
+I have provided the complete project ZIP. You must work directly inside this existing codebase.
+
+This is not a request to create a new application, a separate demo, or a static prototype.
+
+I want two major changes:
+
+**CHANGE 1: Update the landing page content and destination data while preserving its approved cinematic visual design.**
+
+**CHANGE 2: Completely replace the existing Travel Assist experience with the new SMART LOCAL HOP feature.**
+
+The existing application has working authentication, routing, destination discovery, Google Maps integrations, user workspaces and other features. Preserve them.
+
+Do not blindly rewrite the application.
+
+First understand the existing source code, then implement the changes in the existing architecture.
+
+========================================================
+PART 1 — EXISTING PROJECT ARCHITECTURE
+========================================================
+
+The project currently uses:
+
+- React 19
+- TypeScript
+- Vite 8
+- Express backend
+- Tailwind CSS 4
+- React Router 7
+- Motion animations
+- Google Maps SDK
+- Google Places API
+- Google Routes API
+- OSRM road routing
+- Curated Indian location database
+- Existing fare calculation engine
+- Existing authentication and user workspace
+
+Important existing files:
+
+LANDING PAGE:
+- src/pages/LandingPage.tsx
+- src/components/LandingStorySections.tsx
+- src/components/DestinationCarousel.tsx
+- src/components/DetailOverlay.tsx
+- src/data/destinations.ts
+
+TRAVEL ASSIST:
+- src/features/travel-assist/TravelAssistPage.tsx
+- src/features/travel-assist/CompareRidesPage.tsx
+- src/features/travel-assist/travelAssistSession.ts
+- src/components/TravelProgressTracker.tsx
+- src/components/ProviderBadge.tsx
+- src/components/GoogleRouteMap.tsx
+- src/data/fareEngine.ts
+- src/data/indiaLocations.ts
+
+APPLICATION:
+- src/App.tsx
+- src/contexts/AppContext.tsx
+- src/components/Navbar.tsx
+- src/pages/DashboardPage.tsx
+- src/utils/i18n.ts
+- server.ts
+- .env.example
+
+Inspect the actual implementation before editing.
+
+Do not assume that every API is already implemented merely because an environment variable exists.
+
+========================================================
+PART 2 — LANDING PAGE CONTENT AND DATA REDESIGN
+========================================================
+
+IMPORTANT:
+THE EXISTING LANDING PAGE VISUAL DESIGN IS APPROVED.
+
+I do not want its overall cinematic appearance destroyed.
+
+Preserve:
+- Dark editorial background.
+- Cinematic hero.
+- Existing typography style.
+- Existing visual hierarchy.
+- Beautiful Indian destination photography.
+- Scroll-based storytelling.
+- Smooth horizontal card entrances.
+- Existing cinematic section transitions.
+- Existing overall layout and spacing where already working.
+
+Do not redesign the landing page from scratch.
+
+I want its CONTENT, DESTINATION DATA AND TRAVEL ASSIST SHOWCASE UPDATED.
+
+--------------------------------------------------------
+2A. REPLACE THE FOUR SPECIFIC HERO DESTINATION CARDS
+--------------------------------------------------------
+
+Currently, HERO_DECK_CARDS in:
+
+src/components/LandingStorySections.tsx
+
+contains only four specific destinations:
+
+- Shri Jagannath Temple.
+- City Palace & Pichola.
+- Old Manali Deodar Ridge.
+- Hawa Mahal Facade.
+
+I do not want the first visual destination deck to be limited to only four named places.
+
+Replace the four-card content with eight broad India travel categories.
+
+Use these exact category concepts:
+
+1. Temples & Heritage
+2. Heritage Palaces
+3. Mountains
+4. Beaches
+5. Heritage Cities
+6. Cafe Corner
+7. Adventure
+8. Stay Reality / Verified Stays
+
+The goal is to make the landing page communicate that Yatra Saathi covers different kinds of Indian travel experiences rather than a handful of selected destinations.
+
+Use the already bundled photography wherever appropriate.
+
+Available assets include:
+
+- Jagannath Temple.
+- Udaipur Palace.
+- Manali Himalayas.
+- Indian beaches.
+- Hawa Mahal.
+- Cafe rooftop.
+- Adventure paragliding.
+- Homestay interiors.
+
+Use a different relevant image for each category.
+
+Do not repeat the same photograph across multiple cards.
+
+The cards must have:
+- Clear category titles.
+- Strong readable text.
+- High-quality image cropping.
+- Proper dark image overlays.
+- Consistent card dimensions.
+- Consistent border radius.
+- Attractive category labels.
+
+Do not use awkward truncation such as:
+"Shri Jagannath..."
+"City Palace &..."
+"Old Manali Deo..."
+
+The new category titles must fit without clipping.
+
+Keep the existing cinematic slide-in animation, but make it faster and smoother.
+
+Use short, non-blocking animations and a small stagger.
+
+Do not add random card rotations or crooked card positioning.
+
+Desktop:
+- Balanced category card grid or horizontal cinematic strip.
+- All cards must align properly.
+
+Mobile:
+- Smooth horizontal swipe.
+- No clipped text.
+- No horizontal page overflow.
+
+The card interaction must remain meaningful.
+
+Clicking a category should take the user to the corresponding category context in Explore & Plan or the relevant feature, not an unrelated default destination.
+
+Do not use a hardcoded Udaipur fallback for every generic category.
+
+Inspect buildOverlayPayloadFromHeroCard() and correct its category-to-destination handling.
+
+For Verified Stays:
+Only use the word "Verified" when actual verification data exists. Otherwise use "Stay Reality" and transparently represent the information available.
+
+--------------------------------------------------------
+2B. UPDATE THE INDIA CATEGORY DATA
+--------------------------------------------------------
+
+The existing INDIA_BROAD_CATEGORIES already contains eight broad categories.
+
+Preserve this useful structure, but review and improve its content.
+
+Categories:
+- Temples & Spiritual Journeys.
+- Mountains & Hill Stations.
+- Beaches & Coastal Escapes.
+- Heritage & Royal Palaces.
+- Nature & Wildlife.
+- Adventure & Experiences.
+- Lakes & Backwaters.
+- Cafes & Local Food.
+
+Update:
+- Category descriptions.
+- Featured destination names.
+- Region labels.
+- Descriptions and notes.
+- Card image associations.
+- Navigation destinations.
+
+Make the destination coverage feel pan-India.
+
+Include representative regions such as:
+- Puri.
+- Katra.
+- Vaishno Devi.
+- Varanasi.
+- Rishikesh.
+- Jaipur.
+- Udaipur.
+- Manali.
+- Spiti.
+- Goa.
+- Kerala.
+- Alleppey.
+- Varkala.
+- Hampi.
+- Meghalaya.
+- Northeast India.
+
+Do not make the whole platform appear focused on only Puri, Jaipur, Manali and Udaipur.
+
+However, do not fabricate specific business information, fees, transport tariffs or verified claims.
+
+Correct misleading or unverified static claims.
+
+For example, a specific public ferry fare or a claim that a particular local facility is verified must only be displayed when there is an appropriate source.
+
+Preserve useful real curated destination information.
+
+--------------------------------------------------------
+2C. REPLACE OLD TRAVEL ASSIST LANDING SECTION
+--------------------------------------------------------
+
+The current FindYourWaySection() is outdated.
+
+It currently displays:
+- "Compare Bike, Auto, and Cab routes..."
+- Vehicle comparison cards.
+- Static typical base fares.
+- Railway station hero image.
+- Old ride comparison messaging.
+
+Replace this entire section's CONTENT and showcase.
+
+Keep the overall premium dark editorial visual language of the landing page.
+
+New section:
+
+Eyebrow:
+02. SMART LOCAL HOP
+
+Heading:
+"Every local journey, with more confidence."
+
+Highlighted word:
+"confidence"
+
+Description:
+"Know what a fair local fare looks like, reach places before they close, and discover useful stops along your actual route — all in one intelligent travel companion."
+
+Show three feature showcases:
+
+CARD 1 — FAIR FARE & LOCAL VOICE PASS
+
+Description:
+"Understand reasonable local transport fares and communicate confidently with drivers in their language."
+
+Visual:
+A beautiful Indian auto-rickshaw / e-rickshaw / local street transport photograph.
+
+CARD 2 — TIMING & CROWD CLOCK
+
+Description:
+"Plan around attraction timings, sunset windows, travel buffers and return journeys."
+
+Visual:
+A beautiful temple, heritage monument or sunset photograph.
+
+CARD 3 — ZERO-DETOUR EN-ROUTE PITSTOPS
+
+Description:
+"Find washrooms, food, ATMs and other essentials along the route without unnecessary detours."
+
+Visual:
+A beautiful Indian local cafe / street food / market photograph.
+
+Each feature showcase should have:
+- Feature number.
+- Feature title.
+- Short explanation.
+- Beautiful image.
+- Small relevant visual detail.
+- A clear CTA to open Travel Assist.
+
+Remove:
+- Bike/Auto/Cab flip comparison showcase.
+- Static typical base fare figures.
+- Old "All-India Arrival Intelligence" vehicle comparison block.
+- Old ride comparison messaging.
+
+The section should feel like a premium product introduction.
+
+--------------------------------------------------------
+2D. UPDATE ALL OLD TRAVEL ASSIST COPY ON THE LANDING PAGE
+--------------------------------------------------------
+
+Search the entire landing page for outdated text.
+
+Replace old references to:
+- Compare arrival rides.
+- Compare Bike, Auto and Cab.
+- Itemized fare comparison.
+- Compare arrival rides directly.
+- Use Travel Assist to compare arrival rides.
+
+Update:
+- Hero supporting paragraph.
+- Selected category description.
+- Travel Assist section.
+- Final CTA paragraph.
+- Relevant CTA labels.
+- Dashboard Travel Assist description.
+- Any other outdated Travel Assist description.
+
+New product positioning:
+
+"Travel Assist is your intelligent local journey companion. It helps you understand fair local fares, manage destination timings and discover essential facilities along your route."
+
+Do not modify the approved overall landing page structure or the Explore & Plan and Stay Reality sections unnecessarily.
+
+========================================================
+PART 3 — COMPLETE TRAVEL ASSIST REPLACEMENT
+========================================================
+
+THIS IS THE MOST IMPORTANT PART.
+
+The current:
+
+src/features/travel-assist/TravelAssistPage.tsx
+
+is a large legacy component of approximately 2,697 lines.
+
+It contains the old booking and ride comparison workflow.
+
+I want the ENTIRE Travel Assist frontend redesigned.
+
+Do not simply add three cards below the old interface.
+
+Do not retain the old interface underneath the new one.
+
+Completely replace the old Travel Assist experience with SMART LOCAL HOP.
+
+--------------------------------------------------------
+3A. REMOVE THE OLD INTERFACE
+--------------------------------------------------------
+
+Remove from the Travel Assist user interface:
+
+- Old Arrival Point step.
+- Old First Ride step.
+- Old Explore Destinations step.
+- Old Compare Local Rides step.
+- Old four-step progress tracker.
+- All green completed checkmarks.
+- Old booking comparison dashboard.
+- Old provider comparison cards.
+- Old Bike / Auto / Cab comparison panels.
+- Old ride booking CTA panels.
+- Old Explore Destinations section inside Travel Assist.
+- Old oversized mountain hero image.
+- Old decorative hero photograph that pushes the main function down.
+- Old workflow instructions.
+- Old unnecessary sections.
+
+The old booking and ride comparison experience must not appear anywhere inside the new Travel Assist UI.
+
+Do not delete reusable shared components until checking whether another feature depends on them.
+
+The old /travel-assist/compare route should no longer be part of the main user journey.
+
+Preserve backward compatibility by redirecting old comparison URLs to the new Travel Assist page or an appropriate new detail view.
+
+--------------------------------------------------------
+3B. NEW PAGE LAYOUT
+--------------------------------------------------------
+
+The new Travel Assist page should follow this exact order:
+
+1. Existing navigation bar, visually improved.
+2. Compact Travel Assist introduction.
+3. Main Smart Local Hop planner.
+4. Exactly three feature cards.
+5. Clean spacing and responsive layout.
+
+Do not create a huge decorative hero.
+
+Do not create a large mountain image at the top.
+
+The user should immediately see the actual functionality.
+
+Use the existing warm ivory / cream, forest teal and saffron design language.
+
+Typography must be significantly improved:
+- Large readable headings.
+- Elegant editorial serif headings.
+- Modern sans-serif body text.
+- Strong labels.
+- Comfortable line height.
+- No tiny text.
+- No clipped words.
+- No overlapping content.
+
+The navbar must be visually distinct from the page:
+- Solid light surface.
+- Clear bottom border or subtle shadow.
+- Proper spacing.
+- Clearly visible active Travel Assist item.
+- Responsive mobile menu.
+
+--------------------------------------------------------
+PART 4 — SMART LOCAL HOP MAIN PLANNER
+--------------------------------------------------------
+
+Main heading:
+
+SMART LOCAL HOP
+
+Main tagline:
+
+"Know the fare. Beat the clock. Find what you need along the way."
+
+Supporting text:
+
+"Your intelligent local journey companion for temples, beaches, markets, attractions, railway stations and everyday travel across India."
+
+Main planner title:
+
+"Where are you heading?"
+
+Create two prominent location fields:
+
+FROM:
+- Railway Station.
+- Bus Stand.
+- Airport.
+- Hotel.
+- Temple.
+- Landmark.
+- Market.
+- Current Location.
+- Custom Address.
+
+TO:
+- Temple.
+- Beach.
+- Market.
+- Tourist Attraction.
+- Hotel.
+- Railway Station.
+- Bus Stand.
+- Airport.
+- Custom Address.
+
+Include:
+- Searchable autocomplete.
+- Actual location suggestions.
+- Clear input.
+- Swap locations.
+- Current location action with permission.
+- Explore Journey button.
+
+Use existing location search infrastructure where possible.
+
+Existing endpoint:
+GET /api/places/suggest
+
+Existing curated location database:
+src/data/indiaLocations.ts
+
+Do not build an entirely separate location search system.
+
+Fix the existing location search logic instead.
+
+IMPORTANT KATRA REQUIREMENT:
+
+Ensure the following locations can be searched:
+
+- Shri Mata Vaishno Devi Katra Railway Station.
+- Katra Bus Stand.
+- Banganga Darshani Deodi.
+- Vaishno Devi Bhawan.
+- Tarakote Marg.
+- Ardhkuwari.
+- Sanjichhat.
+- Jammu Tawi Railway Station.
+- Jammu Airport.
+
+The curated database already contains Katra and Vaishno Devi entries. Inspect these records and fix any search filtering or alias-matching issue.
+
+Do not remove these existing curated locations.
+
+CRITICAL LOCATION VALIDATION:
+
+In the existing resolveCustomTextPlace() function, arbitrary coordinates are generated when geocoding fails.
+
+Remove that behaviour.
+
+Never invent coordinates by adding arbitrary latitude/longitude offsets.
+
+Never treat an unresolved text string as a valid location.
+
+A location must have actual resolved coordinates from:
+- Google Places.
+- Curated location data.
+- Another legitimate geocoding result.
+
+If the location cannot be resolved, ask the user to choose a suggestion or enter a more precise address.
+
+--------------------------------------------------------
+PART 5 — SHARED JOURNEY CONTEXT
+--------------------------------------------------------
+
+When the user clicks Explore Journey:
+
+1. Validate From and To.
+2. Resolve coordinates.
+3. Calculate the actual road route.
+4. Retrieve route distance.
+5. Retrieve travel duration.
+6. Retrieve traffic-aware duration where available.
+7. Retrieve route geometry/polyline.
+8. Create one shared journey context.
+9. Make this context available to all three feature cards.
+
+The journey object should include:
+
+- journeyId
+- originLabel
+- originLat
+- originLng
+- destinationLabel
+- destinationLat
+- destinationLng
+- city
+- state
+- distanceKm
+- durationMinutes
+- trafficAwareDurationMinutes
+- routeGeometry
+- routeSource
+- routeTimestamp
+- passengers, if needed
+
+Avoid recalculating the same route separately for each card.
+
+Reuse existing route functions in server.ts.
+
+CURRENT ROUTING REALITY:
+
+The existing server uses OSRM as its primary road-routing service and Google Routes API as a traffic-aware fallback when configured.
+
+Do not claim that OSRM supplies live traffic.
+
+If Google traffic-aware routing is unavailable, label the duration as a route estimate without live traffic.
+
+Do not fabricate route metrics.
+
+--------------------------------------------------------
+PART 6 — THREE FEATURE CARDS
+--------------------------------------------------------
+
+Display exactly three cards.
+
+CARD 1:
+FAIR FARE & LOCAL VOICE PASS
+
+CARD 2:
+TIMING & CROWD CLOCK
+
+CARD 3:
+ZERO-DETOUR EN-ROUTE PITSTOPS
+
+Design:
+- Three equal cards on desktop.
+- Two columns on tablet where appropriate.
+- Stacked cards on mobile.
+- Distinct images.
+- Consistent image ratio.
+- Elegant gradients.
+- Readable text.
+- Clear CTAs.
+- Premium hover animation.
+
+Use bundled images.
+
+Use different photographs for all three cards.
+
+Each card must display a concise summary and a clear action.
+
+Clicking the card's main CTA must open its detailed page in a NEW BROWSER TAB.
+
+Required routes:
+
+/travel-assist/fare
+
+/travel-assist/timing
+
+/travel-assist/pitstops
+
+Do not open a new tab for every minor interaction.
+
+Only the main card CTA should open its corresponding detailed page.
+
+Preserve the selected journey when opening the new tab.
+
+IMPORTANT CROSS-TAB STATE:
+
+The existing travelAssistSession.ts uses sessionStorage.
+
+Do not assume sessionStorage will remain synchronized across independently opened tabs.
+
+Use a robust approach:
+- A unique journeyId.
+- A short query parameter in the URL.
+- A shared localStorage record with an expiry.
+- Or another safe and appropriate existing project mechanism.
+
+Do not put huge encoded route geometries in the URL.
+
+Do not make the user enter From and To again.
+
+Do not silently replace the selected journey with stale data.
+
+========================================================
+PART 7 — FAIR FARE & LOCAL VOICE PASS
+========================================================
+
+Purpose:
+
+Help tourists understand a reasonable local transport fare and communicate confidently with drivers.
+
+Heading:
+
+"Know the fare before you ride."
+
+Display:
+
+- Auto / E-Rickshaw estimated fare.
+- Cab estimated fare.
+- Bike estimated fare, where available.
+- Route distance.
+- Estimated travel time.
+- Fare calculation explanation.
+- Source and confidence.
+- Practical local travel tips.
+
+Example presentation:
+
+Auto / E-Rickshaw: ₹60–₹80.
+
+Cab: ₹130.
+
+Bike: ₹45.
+
+These are illustrative values only.
+
+Never hardcode these as real quotes.
+
+--------------------------------------------------------
+7A. FARE ENGINE
+--------------------------------------------------------
+
+Inspect the existing:
+
+src/data/fareEngine.ts
+
+It currently contains provider rate templates and regional multipliers.
+
+Do not blindly reuse the existing values as verified current fares.
+
+The current static rate data and source descriptions require verification.
+
+Refactor it into a transparent, configurable estimate engine.
+
+Fare configuration should support:
+
+- City.
+- Transport category.
+- Base fare.
+- Included distance.
+- Per-kilometre rate.
+- Per-minute charge.
+- Minimum fare.
+- Waiting charges.
+- Night charges, when verified.
+- Effective date.
+- Source.
+- Verification date.
+- Confidence level.
+
+Calculation:
+
+Estimated Fare =
+Base Fare +
+Distance Charge +
+Applicable Time Charge +
+Applicable Fees.
+
+Show a range rather than pretending to know the exact negotiated amount.
+
+Every estimate must have a clear label:
+
+1. Verified Local Tariff.
+2. Calculated Indicative Estimate.
+3. Approximate Estimate.
+4. Fare Information Unavailable.
+
+Do not present calculated estimates as live provider quotes.
+
+Do not claim that a Rapido, Ola or Uber vehicle is available.
+
+Do not claim that the fare is confirmed by the provider.
+
+If no reliable city-specific tariff is configured, show that the local fare reference is unavailable or use a clearly labelled approximate estimate only when the underlying assumptions are available and visible.
+
+Remove unsupported source claims and fake verification dates.
+
+--------------------------------------------------------
+7B. LOCAL TRAVEL TIPS
+--------------------------------------------------------
+
+Show useful destination-specific advice.
+
+Example:
+
+"Compare the quoted fare with the estimated range before boarding. Ask whether a shared or metered option is available."
+
+Tips should be based on curated or verified information.
+
+The existing curated location database includes useful Katra and Puri ground tips.
+
+Reuse those legitimate records.
+
+Do not generate fictional local tips such as invented shop names, arbitrary prices or unverified transport rules.
+
+If no verified tip exists, display a neutral practical suggestion.
+
+--------------------------------------------------------
+7C. LOCAL VOICE PASS
+--------------------------------------------------------
+
+Create a prominent speaker action.
+
+Languages:
+- Hindi.
+- English.
+- Odia.
+- Tamil.
+- Marathi.
+- Bengali.
+- Other supported languages.
+
+Example:
+
+"Bhaiya, route lagbhag 3.2 kilometre hai. Is distance ke liye ₹70 ke aas-paas sahi estimate hai. Kya aap chalenge?"
+
+The script must be:
+- Polite.
+- Respectful.
+- Confident.
+- Natural.
+- Short.
+- Non-confrontational.
+
+Use Groq for script generation and translation only when GROQ_API_KEY is configured.
+
+IMPORTANT:
+The existing project currently does not have a completed Groq translation endpoint.
+
+Implement a proper server-side endpoint.
+
+Do not expose GROQ_API_KEY to the frontend.
+
+Use browser SpeechSynthesis for playback.
+
+Controls:
+- Language selection.
+- Script preview.
+- Speak.
+- Stop.
+- Replay.
+- Copy text.
+
+Check actual browser speech voice availability.
+
+If a voice is unavailable:
+- Show the translated text.
+- Explain that spoken playback is unavailable for that language.
+- Allow the user to copy the text.
+
+Do not automatically play speech.
+
+Do not invent a successful voice playback state.
+
+========================================================
+PART 8 — TIMING & CROWD CLOCK
+========================================================
+
+Purpose:
+
+Prevent tourists from missing temple darshan, attraction closing times, sunset windows, and return trains/buses.
+
+Heading:
+
+"Reach at the right time."
+
+Show:
+
+- Travel duration.
+- Traffic-aware duration, when available.
+- Walking buffer.
+- Parking buffer.
+- Darshan/activity buffer.
+- Estimated arrival time.
+- Destination opening hours.
+- Closing time.
+- Remaining safe time.
+
+Example:
+
+Driving: 18 minutes.
+
+Walking / Parking / Darshan Buffer: 20 minutes.
+
+Total: 38 minutes.
+
+These are illustrative values only.
+
+Allow users to choose:
+
+- Temple / Darshan.
+- Fort / Monument.
+- Beach / Sunset.
+- Sightseeing.
+- Return Train.
+- Return Bus.
+- Custom Deadline.
+
+TIMING LOGIC:
+
+Estimated Arrival =
+Current Local Time + Travel Duration + Required Buffer.
+
+Safe Margin =
+Deadline − Estimated Arrival.
+
+Display three clear states:
+
+SAFE:
+Enough time remains.
+
+HURRY:
+Limited time remains.
+
+RISK:
+The destination may close before arrival.
+
+Example:
+
+"Your estimated arrival is 5:15 PM. Only 25 minutes remain before closing. Consider a faster available route."
+
+RETURN JOURNEY:
+
+Allow the user to enter:
+- Train departure time.
+- Bus departure time.
+- Station/terminal.
+- Recommended reporting buffer.
+
+Show the remaining safe margin.
+
+Do not claim a train or bus departure is verified unless a reliable timetable source is connected.
+
+--------------------------------------------------------
+8A. CROWD INFORMATION
+--------------------------------------------------------
+
+Clearly distinguish:
+
+- Verified Live Crowd.
+- Third-Party Crowd Indicator.
+- Historical Crowd Pattern.
+- Estimated Crowd.
+- Information Unavailable.
+
+The existing project does not currently have a verified live crowd integration.
+
+Do not fabricate live crowd counts or percentages.
+
+Do not ask Groq to invent crowd conditions.
+
+If no verified data source is available, display:
+
+"Crowd information is currently unavailable."
+
+You may show a separately labelled historical or approximate indicator only if actual supporting data exists.
+
+========================================================
+PART 9 — ZERO-DETOUR EN-ROUTE PITSTOPS
+========================================================
+
+Purpose:
+
+Help travellers find essential facilities along their selected route without unnecessary detours.
+
+Heading:
+
+"Useful stops, already on your way."
+
+Category chips:
+
+1. Washroom.
+2. Pure Veg.
+3. Local Food.
+4. ATM.
+5. Pharmacy.
+6. Luggage Cloakroom.
+
+Use Google Places API (New).
+
+The existing server already uses Google Places Nearby Search in some location discovery flows.
+
+However, the new feature must search along the actual route corridor rather than just around the destination.
+
+Implement a route-corridor discovery strategy:
+
+1. Use the shared route geometry.
+2. Sample appropriate points along the route.
+3. Search supported Places categories around those route points.
+4. Deduplicate returned places.
+5. Filter out locations too far from the route.
+6. Calculate actual detour distance and time.
+7. Return useful places in route order.
+
+Each result can show:
+
+- Business name.
+- Image when available.
+- Rating when available.
+- Number of ratings when available.
+- Approximate route position.
+- Distance ahead.
+- Additional detour distance.
+- Additional detour time.
+- Open status when available.
+- Directions action.
+
+Example:
+
+Nrusimha Sweets.
+
+1.2 km ahead.
+
+4.6 stars.
+
+0 min additional detour.
+
+This is only an illustrative layout example.
+
+Never hardcode it as a real search result.
+
+--------------------------------------------------------
+9A. DETOUR CALCULATION
+--------------------------------------------------------
+
+A business near a route is not necessarily on the route.
+
+Calculate:
+
+Additional Distance =
+Alternative Route Distance − Original Route Distance.
+
+Where possible, calculate the alternative route using actual routing data.
+
+Do not assume that straight-line distance is road distance.
+
+Only show "Zero Detour" when the additional detour is genuinely negligible.
+
+Otherwise display the actual extra distance and estimated time.
+
+Do not invent:
+- Business ratings.
+- Opening status.
+- Washroom availability.
+- Cleanliness.
+- Business names.
+- Food quality.
+- Luggage facilities.
+
+If a facility type cannot be reliably found, display an empty-state message.
+
+Google Places may not provide every requested facility category directly.
+
+For unsupported categories, do not silently substitute an unrelated business.
+
+========================================================
+PART 10 — DETAIL PAGES
+========================================================
+
+Create three independent detailed pages.
+
+Routes:
+
+/travel-assist/fare
+
+/travel-assist/timing
+
+/travel-assist/pitstops
+
+Each page must:
+- Open in a new browser tab from its main card CTA.
+- Preserve the selected journey.
+- Have a proper page heading.
+- Have a clear back-to-Travel-Assist action.
+- Use the same warm ivory, deep teal and saffron visual system.
+- Have polished responsive layout.
+- Use concise loading states.
+- Have meaningful empty states.
+- Display data source and freshness.
+- Avoid fake success messages.
+
+FARE PAGE:
+- Fare categories.
+- Estimated fare ranges.
+- Calculation breakdown.
+- Local tips.
+- Source and confidence.
+- Local Voice Pass.
+
+TIMING PAGE:
+- Journey timeline.
+- Travel time.
+- Buffer calculation.
+- Opening and closing information.
+- Deadline alerts.
+- Return journey planner.
+- Crowd information with source status.
+
+PITSTOPS PAGE:
+- Category filters.
+- Place results.
+- Route ordering.
+- Additional detour distance/time.
+- Directions.
+- Map when available.
+
+Do not build three unrelated applications.
+
+Use reusable components and shared types.
+
+========================================================
+PART 11 — BACKEND API DESIGN
+========================================================
+
+Inspect server.ts before adding endpoints.
+
+Reuse existing utilities wherever possible.
+
+Existing useful functions include:
+- computeRoadDistance()
+- decodeGooglePolyline()
+- downsamplePath()
+- haversineKm()
+- Existing Google Places requests.
+- Existing curated location lookup.
+
+Implement new backend endpoints only where required.
+
+Suggested endpoints:
+
+POST /api/smart-hop/route
+
+POST /api/smart-hop/fare
+
+POST /api/smart-hop/local-voice
+
+POST /api/smart-hop/timing
+
+GET /api/smart-hop/pitstops
+
+These are suggested contracts. Adapt them to the existing architecture.
+
+Validate all inputs.
+
+Use timeouts and AbortController for external API calls.
+
+Handle quota limits and unavailable integrations.
+
+Use caching where appropriate.
+
+Do not make duplicate Google API requests unnecessarily.
+
+Do not expose Groq or other server secrets.
+
+The existing runtime configuration exposes the browser Maps key for Google Maps SDK usage. Keep browser key restrictions and API restrictions in mind. Never expose Groq secrets.
+
+Do not return secrets from runtime configuration.
+
+========================================================
+PART 12 — NEW ROUTING AND OLD ROUTE CLEANUP
+========================================================
+
+Inspect src/App.tsx.
+
+Currently it has:
+
+/travel-assist
+
+/travel-assist/compare
+
+Add:
+
+/travel-assist/fare
+
+/travel-assist/timing
+
+/travel-assist/pitstops
+
+Preserve authentication protection.
+
+All new pages must require the same authenticated access as the existing Travel Assist page.
+
+Remove the old comparison page from the new user flow.
+
+Do not leave broken links.
+
+Do not break existing direct links from other parts of the application.
+
+If legacy URLs exist, redirect them safely.
+
+Ensure that landing page CTAs and dashboard feature cards point to the new Travel Assist experience.
+
+========================================================
+PART 13 — DASHBOARD AND ALL TRAVEL ASSIST REFERENCES
+========================================================
+
+Inspect:
+
+src/pages/DashboardPage.tsx
+
+The current Travel Assist description says:
+
+"Compare rides and reach your first destination confidently."
+
+Replace it with:
+
+"Understand local fares, manage important timings and find useful stops along your journey."
+
+Review all Travel Assist references across the project.
+
+Update outdated:
+- Descriptions.
+- CTAs.
+- Feature labels.
+- Page titles.
+- Old workflow language.
+- Booking comparison language.
+- Fare comparison references.
+
+Do not unnecessarily rename the primary navigation item "Travel Assist".
+
+Do not alter the core three-feature structure:
+
+1. Travel Assist.
+2. Explore & Plan.
+3. Stay Reality.
+
+Update src/utils/i18n.ts wherever existing landing/dashboard copy needs to remain consistent with the new positioning.
+
+Do not introduce broken or incomplete translations.
+
+========================================================
+PART 14 — PERFORMANCE AND ANIMATION
+========================================================
+
+I want a cinematic premium interface, but the application must remain FAST.
+
+Use the existing Motion library.
+
+Use:
+- Short entrance animations.
+- Subtle stagger.
+- Image reveal.
+- Smooth card transitions.
+- Small hover zoom.
+- Soft elevation.
+- Refined page transitions.
+
+Typical UI transition target:
+250–450 ms.
+
+Avoid:
+- Slow cinematic waiting sequences.
+- Heavy parallax.
+- Long entrance animations.
+- Excessive scroll-triggered effects.
+- Constant animation loops.
+- Repeated expensive API calls.
+- Large unnecessary dependencies.
+- Fake loading delays.
+
+Do not block user interaction while animations run.
+
+Support prefers-reduced-motion.
+
+Lazy-load images where appropriate.
+
+Preserve the existing smooth-scroll system without creating conflicts.
+
+========================================================
+PART 15 — DESIGN QUALITY
+========================================================
+
+The internal Travel Assist page must look substantially better than the current interface.
+
+Use:
+- Warm ivory background.
+- Deep forest teal.
+- Saffron accents.
+- Elegant editorial headings.
+- Modern readable typography.
+- Premium cards.
+- Beautiful Indian travel photographs.
+- Consistent icon style.
+- Proper spacing.
+- Clear navigation separation.
+
+The landing page remains dark and cinematic.
+
+Internal pages remain light and elegant.
+
+Do not apply the dark landing page styling globally.
+
+Do not create huge empty hero areas.
+
+Do not make cards crooked or uneven.
+
+Do not allow text to overflow.
+
+Do not use tiny typography.
+
+Ensure that card images do not overlap text.
+
+Do not use arbitrary decorative images that do not relate to the feature.
+
+========================================================
+PART 16 — PRESERVE THE REST OF YATRA SAATHI
+========================================================
+
+Do not break or redesign unrelated features.
+
+Preserve:
+
+- Authentication.
+- Registration.
+- Login.
+- Password reset.
+- User profile.
+- Logout.
+- User workspace.
+- Saved items.
+- Saved routes.
+- Recently viewed destinations.
+- Explore & Plan.
+- Explore detail pages.
+- Stay Reality.
+- Stay detail pages.
+- Language selection.
+- Navbar routing.
+- Existing shared detail overlay.
+- Existing destination data.
+- Existing Maps integration.
+
+Do not overwrite:
+
+.data/yatra_saathi_store.json
+
+Do not delete existing user workspace data.
+
+Do not delete existing environment configuration.
+
+Do not overwrite .env or expose credentials.
+
+Do not unnecessarily replace package dependencies.
+
+Do not rewrite server.ts wholesale.
+
+Only modify the shared backend functions when genuinely necessary.
+
+========================================================
+PART 17 — TESTING AND ACCEPTANCE CRITERIA
+========================================================
+
+Test the final application with these real sample journeys:
+
+PURI:
+Shri Jagannath Temple → Golden Beach.
+
+PURI:
+Puri Railway Station → Shri Jagannath Temple.
+
+KATRA:
+Katra Railway Station → Banganga Darshani Deodi.
+
+KATRA:
+Katra → Vaishno Devi Yatra Gate.
+
+VARANASI:
+Varanasi Railway Station → Kashi Vishwanath Temple.
+
+JAIPUR:
+Jaipur Railway Station → Hawa Mahal.
+
+For each journey verify:
+
+- Search suggestions.
+- Correct coordinates.
+- Route calculation.
+- Distance.
+- Duration.
+- Traffic-aware status.
+- Fare estimate.
+- Fare source.
+- Timing calculations.
+- Pitstop discovery.
+- Detour calculations.
+- New-tab navigation.
+- Journey persistence.
+
+Test failure conditions:
+
+- Invalid location.
+- Missing Google Maps key.
+- Missing Groq key.
+- Google API quota exceeded.
+- Routing unavailable.
+- No matching Places results.
+- No fare configuration.
+- Missing attraction hours.
+- Missing crowd information.
+- Unsupported browser voice.
+- Blocked popup.
+- Mobile layout.
+
+Expected behaviour:
+
+The UI must show clear unavailable states.
+
+It must never invent a successful API response.
+
+Run:
+
+npm run lint
+
+npm run build
+
+Fix TypeScript errors and build errors.
+
+Do not claim tests passed unless they actually passed.
+
+========================================================
+PART 18 — FINAL EXECUTION ORDER
+========================================================
+
+Follow this implementation order:
+
+PHASE 1:
+Audit the source code and map all existing dependencies.
+
+PHASE 2:
+Update landing page category data and hero deck.
+
+PHASE 3:
+Replace the old landing page Travel Assist showcase.
+
+PHASE 4:
+Replace the complete Travel Assist frontend.
+
+PHASE 5:
+Implement Smart Local Hop planner and shared journey state.
+
+PHASE 6:
+Implement Fair Fare and Local Voice Pass.
+
+PHASE 7:
+Implement Timing & Crowd Clock with transparent data status.
+
+PHASE 8:
+Implement Zero-Detour En-route Pitstops.
+
+PHASE 9:
+Create the three separate detail routes and new-tab navigation.
+
+PHASE 10:
+Update dashboard and all outdated Travel Assist references.
+
+PHASE 11:
+Test all journeys, responsive layouts and API failure states.
+
+PHASE 12:
+Run the final TypeScript check and production build.
+
+Do not stop after creating the UI.
+
+Do not leave non-functional buttons.
+
+Do not replace working backend functionality with hardcoded demo results.
+
+Do not create duplicate route systems.
+
+========================================================
+FINAL PRODUCT VISION
+========================================================
+
+Yatra Saathi must feel like a genuine Indian travel intelligence platform.
+
+LANDING PAGE:
+
+Keep the beautiful cinematic experience.
+
+Show broad Indian travel categories rather than only four specific locations.
+
+Update all old Travel Assist content to the new Smart Local Hop identity.
+
+TRAVEL ASSIST:
+
+Completely replace the old ride-booking/ride-comparison dashboard.
+
+The user should immediately see:
+
+SMART LOCAL HOP
+
+FROM → TO planner.
+
+Then exactly three premium cards:
+
+1. Fair Fare & Local Voice Pass.
+2. Timing & Crowd Clock.
+3. Zero-Detour En-route Pitstops.
+
+Each feature opens its own detailed page in a new tab.
+
+The experience must be visually polished, genuinely useful, responsive and fast.
+
+The final product should not look like an ordinary cab-booking application.
+
+It should look like a premium local travel intelligence system built specifically for the realities of travelling across India.
+
+IMPLEMENT THE CHANGES DIRECTLY IN THE EXISTING PROJECT.
+
+Do not return only a plan.
+
+Do not return only a visual mockup.
+
+Do not stop at the first phase.
+
+Complete the implementation, test it and report the actual result.
+
+At completion, provide:
+- Files changed.
+- Old components removed or retired.
+- New components created.
+- Backend endpoints added or modified.
+- APIs successfully tested.
+- Integrations requiring configuration.
+- Build and TypeScript test results.
+- Any remaining limitations.
+
+Preserve all unrelated functionality and existing user data.

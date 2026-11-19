@@ -1,60 +1,13 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  AnimatePresence,
-  motion,
-  useMotionValue,
-  useReducedMotion,
-  useScroll,
-  useSpring,
-  useTransform,
-  type MotionValue,
-} from 'motion/react';
-import { ArrowRight, Compass, MapPin, ShieldCheck, Train } from 'lucide-react';
+import { ArrowRight, Clock, Compass, MapPin, ShieldCheck, Train } from 'lucide-react';
 import { SafeImage } from './SafeImage';
-import { MaskedHeadlineWords, Reveal } from './Reveal';
+import { MaskedHeadlineWords, Reveal, RevealGroup, RevealItem } from './Reveal';
+import { FlipCard } from './FlipCard';
+import { MotionCard } from './MotionCard';
 import { useDetailOverlay, type PlaceOverlayPayload } from './DetailOverlay';
 import { DESTINATIONS, IMAGES } from '../data/destinations';
-import {
-  EASE_CINEMA,
-  EASE_PRIMARY,
-  SCROLL_SPRING,
-  TILT_SPRING,
-} from '../motion/tokens';
-
-function useMeasuredWidth(ref: RefObject<HTMLElement | null>, fallbackWidth = 1240) {
-  const [width, setWidth] = useState(fallbackWidth);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const update = () => {
-      const next = el.clientWidth;
-      if (next > 0) {
-        setWidth(next);
-      }
-    };
-
-    update();
-
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', update);
-      return () => window.removeEventListener('resize', update);
-    }
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry && entry.contentRect.width > 0) {
-        setWidth(Math.round(entry.contentRect.width));
-      }
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [ref]);
-
-  return width;
-}
+import { DUR_SLIDE_MS, STAGGER_CARDS_MS } from '../motion/tokens';
 
 export interface HeroDeckCard {
   id: string;
@@ -63,156 +16,143 @@ export interface HeroDeckCard {
   category: string;
   image: string;
   destId?: string;
+  detailRoute: string;
   description: string;
   bestTime: string;
   highlights: string[];
-  baseRotate: number;
-  baseY: number;
-  zIndex: number;
 }
 
 export const HERO_DECK_CARDS: HeroDeckCard[] = [
   {
-    id: 'puri-temple',
-    title: 'Shri Jagannath Temple',
-    location: 'Puri, Odisha',
-    category: 'Temples & Heritage',
+    id: 'cat-temples-heritage',
+    title: 'Temples & Heritage',
+    location: 'Puri · Katra · Varanasi · Hampi',
+    category: 'Spiritual & Ancient Shrines',
     image: IMAGES.jagannathTemple,
+    detailRoute: '/explore?category=Temples%20%26%20Spiritual%20Journeys',
     description:
-      '12th-century Kalinga sandstone shrine anchored along Grand Road in Puri, famous for early morning darshan and the coastal pilgrim precinct.',
-    bestTime: '5:30 AM – 8:30 AM (softer queues)',
-    highlights: ['Kalinga Architecture', 'Coastal Pilgrim Hub', 'Prepaid Auto Stand', 'Grand Road Market'],
-    baseRotate: -7.5,
-    baseY: 22,
-    zIndex: 11,
+      'Early-morning darshan windows, dress advisories, and station-to-shrine local transit notes across major temple corridors in India.',
+    bestTime: 'Dawn & Evening Aarti Hours',
+    highlights: ['Darshan Windows', 'Local Transit Notes', 'Cloakroom Tips'],
   },
   {
-    id: 'udaipur-palace',
-    title: 'City Palace & Pichola',
-    location: 'Udaipur, Rajasthan',
-    category: 'Heritage Palaces',
+    id: 'cat-heritage-palaces',
+    title: 'Heritage Palaces',
+    location: 'Udaipur · Jaipur · Jodhpur · Mysore',
+    category: 'Royal Citadels & Courtyards',
     image: IMAGES.udaipurHero,
     destId: 'udaipur',
+    detailRoute: '/explore?dest=udaipur',
     description:
-      'Mewar royal complex spanning 11 interconnected courtyards above Lake Pichola with panoramic views of Jag Mandir and Aravalli ridges.',
-    bestTime: '9:30 AM – 11:30 AM',
-    highlights: ['11 Courtyards', 'Lake Pichola Views', 'Old City Auto Drop', 'Museum Entry Verified'],
-    baseRotate: -4.2,
-    baseY: 8,
-    zIndex: 13,
+      'Sandstone courtyards, hillside forts, and lakeside palaces with practical old-city cab restrictions and museum timings.',
+    bestTime: '9:00 AM – 11:30 AM',
+    highlights: ['Courtyard Museums', 'Old City Access', 'Audio & Ticket Info'],
   },
   {
-    id: 'manali-himalayas',
-    title: 'Old Manali Deodar Ridge',
-    location: 'Manali, Himachal Pradesh',
-    category: 'Mountains',
+    id: 'cat-mountains',
+    title: 'Mountains',
+    location: 'Manali · Spiti · Meghalaya · Ladakh',
+    category: 'Himalayan & Ridge Escapes',
     image: IMAGES.manaliValley,
     destId: 'manali',
+    detailRoute: '/explore?dest=manali',
     description:
-      'Traditional kath-kuni timber homes tucked beneath towering deodar cedar groves above the Manalsu river footbridge.',
-    bestTime: '7:30 AM – 11:00 AM',
-    highlights: ['Cedar Forest Walks', 'Apple Orchards', 'Manalsu Footbridge', 'Union Taxi Advisories'],
-    baseRotate: -1.6,
-    baseY: -8,
-    zIndex: 16,
+      'High-altitude cedar valleys, mountain passes, and misty Northeast ridges planned with seasonal access and local union cab notes.',
+    bestTime: 'Morning Light & Clear Windows',
+    highlights: ['Pass Advisories', 'Local Taxi Rules', 'Alpine Trails'],
   },
   {
-    id: 'indian-beach',
-    title: 'Golden Coast at Dusk',
-    location: 'Puri & Konkan Coast',
-    category: 'Beaches',
+    id: 'cat-beaches',
+    title: 'Beaches',
+    location: 'Puri · Goa · Varkala · Gokarna',
+    category: 'Coastlines & Laterite Cliffs',
     image: IMAGES.indianBeach,
+    destId: 'alleppey',
+    detailRoute: '/explore?category=Beaches%20%26%20Coastal%20Escapes',
     description:
-      'Calm Bay of Bengal and Arabian Sea coastal promenades lined with fishing boats, clean evening walkways, and breezy tea stalls.',
-    bestTime: '5:30 AM Sunrise or 5:15 PM Dusk',
-    highlights: ['Blue Flag Walks', 'Calm Evening Breeze', 'Auto Accessible', 'Zero Crowded Touts'],
-    baseRotate: 0.4,
-    baseY: -4,
-    zIndex: 18,
+      'Calm sunrise promenades, dramatic southern cliffs, and coastal bays paired with practical sunset arrival timing and sea-front access.',
+    bestTime: 'Sunrise & Golden Hour',
+    highlights: ['Quiet Shorelines', 'Sunset Timing', 'Coastal Connectivity'],
   },
   {
-    id: 'jaipur-hawa',
-    title: 'Hawa Mahal Facade',
-    location: 'Jaipur, Rajasthan',
-    category: 'Heritage Cities',
+    id: 'cat-heritage-cities',
+    title: 'Heritage Cities',
+    location: 'Jaipur · Varanasi · Hampi · Old Delhi',
+    category: 'Walled Towns & Bazaars',
     image: IMAGES.hawaMahal,
     destId: 'jaipur',
+    detailRoute: '/explore?dest=jaipur',
     description:
-      'Five-storey 1799 honeycomb sandstone facade with 953 ventilated jharokhas facing Sireh Deori Bazaar and Badi Chaupar Metro.',
-    bestTime: '8:30 AM – 10:00 AM',
-    highlights: ['953 Jharokhas', 'Pink Line Metro', 'Rooftop Views Opposite', 'Composite Ticket Info'],
-    baseRotate: 2.8,
-    baseY: 6,
-    zIndex: 15,
+      'Living historic quarters, metro-connected bazaars, and riverside ghats mapped for smooth walking loops and last-mile autos.',
+    bestTime: '8:00 AM – 11:00 AM',
+    highlights: ['Metro Connections', 'Old Bazaar Loops', 'Walking Gates'],
   },
   {
-    id: 'rishikesh-cafe',
-    title: 'Ganga Edge Deck & Chai',
-    location: 'Rishikesh, Uttarakhand',
-    category: 'Cafe Corner',
-    image: IMAGES.cafeRiverside,
-    destId: 'rishikesh',
+    id: 'cat-cafe-corner',
+    title: 'Cafe Corner',
+    location: 'Jaipur · Old Manali · Rishikesh · Kochi',
+    category: 'Solo-Friendly & Quiet Tables',
+    image: IMAGES.cafeRooftop,
+    destId: 'jaipur',
+    detailRoute: '/explore?dest=jaipur&tab=cafes',
     description:
-      'Open-air wooden deck overlooking turquoise Ganga rapids, tailored for solo travellers seeking quiet tables and reliable power.',
-    bestTime: '7:30 AM – 10:30 AM',
-    highlights: ['Solo Traveller Friendly', 'Riverside Deck', 'Acoustic Calm', 'Honest Menu Prices'],
-    baseRotate: -2.4,
-    baseY: 14,
-    zIndex: 14,
+      'Daytime rooftop decks, pine-wood mountain corners, and calm neighborhood bakeries curated for unhurried solo breaks.',
+    bestTime: 'Late Morning & Late Afternoon',
+    highlights: ['Quiet Corners', 'Plug Points & Seating', 'Indicative Menus'],
   },
   {
-    id: 'bir-paragliding',
-    title: 'Bir Billing Thermal Glide',
-    location: 'Kangra Valley, Himachal',
-    category: 'Adventure',
+    id: 'cat-adventure',
+    title: 'Adventure',
+    location: 'Rishikesh · Bir Billing · Hampta · Zanskar',
+    category: 'Rafting · Paragliding · Treks',
     image: IMAGES.adventureParagliding,
-    destId: 'manali',
+    destId: 'rishikesh',
+    detailRoute: '/explore?dest=rishikesh&tab=adventures',
     description:
-      '20-minute thermal glide from Billing (2,400 m) over terraced Kangra hills down to Bir Tibetan Colony with SADA-registered pilots.',
-    bestTime: 'March – June, Oct – Dec',
-    highlights: ['SADA Certified Pilots', '2,400m Take-Off', 'Standard Tariff Guide', 'Safety Checklist'],
-    baseRotate: 4.8,
-    baseY: 20,
-    zIndex: 12,
+      'Outdoor Himalayan runs, certified river stretches, and valley hikes listed with seasonal weather windows and safety baselines.',
+    bestTime: 'Season-Specific Daylight',
+    highlights: ['Safety Notes', 'Seasonal Windows', 'Pickup Points'],
   },
   {
-    id: 'courtyard-stay',
-    title: 'Kumbha Courtyard Haveli',
-    location: 'Chandpole, Udaipur',
-    category: 'Verified Stays',
-    image: IMAGES.heritageHaveli,
-    destId: 'udaipur',
+    id: 'cat-stay-reality',
+    title: 'Stay Reality',
+    location: 'Old Towns · Hills · Coastal Belts',
+    category: 'Ground-Level Stay Reality',
+    image: IMAGES.homestayRoom,
+    detailRoute: '/stay-reality',
     description:
-      'Sunlit heritage guesthouse with ground-audited lane access notes, 45 Mbps courtyard fiber Wi-Fi, and zero surprise room tariffs.',
-    bestTime: 'October to March',
-    highlights: ['Audited Lane Access', 'Dual-Band Fiber', 'Walk to City Palace', 'Zero Hidden Tariffs'],
-    baseRotate: 7.2,
-    baseY: 28,
-    zIndex: 10,
+      'Inspect practical room facts upfront — narrow-lane walk distance, car parking slots, Airtel/Jio reception, and extra utility fees.',
+    bestTime: 'Check Before Booking',
+    highlights: ['Lane & Parking Check', 'Wi-Fi & Signal', 'Utility Transparency'],
   },
 ];
 
 function buildOverlayPayloadFromHeroCard(card: HeroDeckCard): PlaceOverlayPayload {
   const dest = card.destId ? DESTINATIONS.find((d) => d.id === card.destId) : undefined;
+  const fallbackGallery = dest
+    ? [card.image, dest.heroImage, dest.attractions[0]?.image].filter((u): u is string => Boolean(u))
+    : [card.image];
   return {
     kind: 'place',
     id: card.id,
-    layoutId: `hero-card-${card.id}`,
     title: card.title,
     category: card.category,
     location: card.location,
     image: card.image,
-    galleryImages: dest
-      ? [card.image, dest.heroImage, dest.attractions[0]?.image, dest.cafes[0]?.image].filter(
-          (u): u is string => Boolean(u)
-        )
-      : [card.image, IMAGES.udaipurHero, IMAGES.indianBeach],
+    galleryImages: Array.from(new Set(fallbackGallery)),
     description: card.description,
     bestTime: card.bestTime,
     highlights: card.highlights,
-    destinationId: card.destId || 'udaipur',
-    detailRoute: card.destId ? `/explore?dest=${card.destId}` : '/explore',
-    itemTypeForSave: card.category === 'Cafe Corner' ? 'cafe' : card.category === 'Adventure' ? 'adventure' : 'attraction',
+    destinationId: card.destId,
+    detailRoute: card.detailRoute,
+    itemTypeForSave:
+      card.id === 'cat-cafe-corner'
+        ? 'cafe'
+        : card.id === 'cat-adventure'
+        ? 'adventure'
+        : card.id === 'cat-stay-reality'
+        ? undefined
+        : 'attraction',
   };
 }
 
@@ -220,181 +160,203 @@ interface HeroSectionProps {
   primaryCtaTo: string;
 }
 
-const GENTLE_FAN_ROTATIONS = [-3.2, -2.0, -0.9, 0.4, -0.5, 1.1, 2.2, 3.2];
-const GENTLE_FAN_OFFSETS = [6, 1, -4, -6, -4, 0, 4, 8];
-
 export function LandingHeroSection({ primaryCtaTo }: HeroSectionProps) {
-  const prefersReducedMotion = Boolean(useReducedMotion());
   const { openDetail } = useDetailOverlay();
-  const heroRef = useRef<HTMLElement | null>(null);
-  const [activeCardId, setActiveCardId] = useState<string>('indian-beach');
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const [activeCardId, setActiveCardId] = useState<string>(HERO_DECK_CARDS[0].id);
+  const [flippedHeroCardId, setFlippedHeroCardId] = useState<string | null>(null);
+  const [entranceSettled, setEntranceSettled] = useState(false);
 
-  const { scrollYProgress } = useScroll({
-    target: heroRef,
-    offset: ['start start', 'end start'],
-  });
-
-  const smoothProgress = useSpring(scrollYProgress, SCROLL_SPRING);
-  const activeProgress = prefersReducedMotion ? scrollYProgress : smoothProgress;
-
-  const ambientOpacity = useTransform(activeProgress, [0, 0.9], [0.3, 0.08]);
-  const ambientY = useTransform(activeProgress, [0, 1], [0, 65]);
+  // Prevent cards from flipping while their initial 450ms entrance settles
+  useEffect(() => {
+    const timer = window.setTimeout(() => setEntranceSettled(true), 680);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const activeCard =
-    HERO_DECK_CARDS.find((c) => c.id === activeCardId) || HERO_DECK_CARDS[3];
+    HERO_DECK_CARDS.find((c) => c.id === activeCardId) || HERO_DECK_CARDS[0];
 
   return (
-    <section
-      ref={heroRef}
-      className="relative overflow-x-clip bg-[#0A0C0B] text-[#F8F6F0] pt-14 sm:pt-20 pb-20 sm:pb-28"
-    >
-      {/* Subtle Ambient Backdrop Crossfading With Active Card + Parallax */}
-      <motion.div
-        style={{
-          opacity: prefersReducedMotion ? 0.22 : ambientOpacity,
-          y: prefersReducedMotion ? 0 : ambientY,
-        }}
-        className="absolute inset-0 pointer-events-none overflow-hidden will-change-transform"
-        aria-hidden="true"
-      >
-        <AnimatePresence mode="sync" initial={false}>
-          <motion.img
-            key={activeCard.image}
-            src={activeCard.image}
-            alt=""
-            referrerPolicy="no-referrer"
-            initial={{ opacity: 0, scale: 1.07 }}
-            animate={{ opacity: 1, scale: 1.02 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: prefersReducedMotion ? 0.15 : 0.75, ease: EASE_CINEMA }}
-            className="absolute inset-0 w-full h-full object-cover blur-2xl scale-105"
-          />
-        </AnimatePresence>
-      </motion.div>
-
+    <section className="relative overflow-x-clip bg-[#0A0C0B] text-[#F8F6F0] pt-12 sm:pt-16 pb-16 sm:pb-24">
       <div
-        className="absolute inset-0 pointer-events-none bg-editorial-grain opacity-75"
+        className="absolute inset-0 pointer-events-none bg-editorial-grain opacity-70"
+        aria-hidden="true"
+      />
+      <div
+        className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_75%_55%_at_50%_14%,rgba(233,163,74,0.14),rgba(10,12,11,0.78)_58%,#0A0C0B_100%)]"
         aria-hidden="true"
       />
 
-      <div
-        className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_75%_55%_at_50%_18%,rgba(233,163,74,0.14),rgba(10,12,11,0.75)_58%,#0A0C0B_100%)]"
-        aria-hidden="true"
-      />
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Clean, Unclipped Hero Copy with 70ms Stagger & Word Reveal */}
+        <div className="max-w-4xl mx-auto text-center space-y-5">
+          <Reveal immediate delayMs={0}>
+            <p className="eyebrow-mono font-medium text-[#8CC9E8] max-w-2xl mx-auto">
+              YATRA SAATHI · GROUND-LEVEL INDIAN TRAVEL INTELLIGENCE
+            </p>
+          </Reveal>
 
-      {/* Soft gradient bridge at bottom of hero */}
-      <div
-        className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-b from-transparent to-[#0B0E0D] pointer-events-none"
-        aria-hidden="true"
-      />
-
-      <div className="relative z-10 max-w-[1420px] mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Editorial Hero Copy with word-by-word masked reveal */}
-        <div className="max-w-4xl mx-auto text-center space-y-6">
-          <motion.p
-            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, ease: EASE_PRIMARY }}
-            className="eyebrow-mono font-medium text-[#8CC9E8]"
-          >
-            Yatra Saathi · Ground-Level Indian Travel Intelligence
-          </motion.p>
-
-          <h1 className="font-editorial text-[42px] sm:text-[60px] lg:text-[76px] font-semibold text-white leading-[1.04] tracking-tight text-balance">
-            <span className="block">
-              <MaskedHeadlineWords text="India is waiting." baseDelay={0.05} />
-            </span>
-            <span className="block mt-1">
-              <MaskedHeadlineWords
-                text="Go beyond the ordinary."
-                accentWord="beyond"
-                baseDelay={0.22}
-              />
-            </span>
+          <h1 className="font-editorial text-[clamp(2.25rem,5vw,4.1rem)] font-semibold text-white leading-[1.12] tracking-tight text-balance">
+            <MaskedHeadlineWords
+              text="Travel India with clarity, not guesswork."
+              accentWord="clarity"
+              baseDelayMs={70}
+              wordStepMs={50}
+              immediate
+            />
           </h1>
 
-          <motion.p
-            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, delay: 0.34, ease: EASE_PRIMARY }}
-            className="text-base sm:text-xl text-[#F8F6F0]/82 leading-relaxed max-w-[60ch] mx-auto"
-          >
-            Discover hidden places, compare your arrival rides and experience every destination across India with confidence.
-          </motion.p>
+          <Reveal immediate delayMs={210}>
+            <p className="text-base sm:text-xl text-[#F8F6F0]/85 leading-relaxed max-w-2xl mx-auto">
+              Understand fair local fares, plan timing and pitstops along your route, discover places worth exploring, and check practical stay details — all in one place.
+            </p>
+          </Reveal>
 
-          <motion.div
-            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.42, ease: EASE_PRIMARY }}
-            className="pt-2 flex flex-wrap items-center justify-center gap-4"
-          >
-            <MagneticCtaLink to={primaryCtaTo} label="Start Exploring" />
-          </motion.div>
+          <Reveal immediate delayMs={280}>
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-4">
+              <Link
+                to={primaryCtaTo}
+                className="ys-btn-primary inline-flex items-center justify-center gap-2.5 px-8 py-3.5 min-h-[52px] rounded-full bg-[#E9A34A] text-[#142322] font-bold text-base sm:text-[17px] hover:bg-[#DF9538] shadow-[0_14px_40px_rgba(233,163,74,0.26)] whitespace-nowrap"
+              >
+                <span>Start Exploring</span>
+                <ArrowRight className="ys-arrow w-5 h-5" aria-hidden="true" />
+              </Link>
+            </div>
+          </Reveal>
         </div>
 
-        {/* All 8 Destination Cards in ONE Evenly-Spaced Non-Overlapping Horizontal Row */}
+        {/* Straight, Evenly Aligned 3D Flip Destination Cards (Slide in from right: 80px -> 0, 650ms, 70ms stagger) */}
         <div className="mt-10 sm:mt-14">
-          <div
-            className="flex flex-nowrap items-stretch gap-[clamp(12px,1.35vw,18px)] overflow-x-auto no-scrollbar snap-x snap-mandatory xl:snap-none py-8 px-3 sm:px-4 xl:px-2 touch-pan-x"
-            onMouseLeave={() => setHoveredIdx(null)}
+          <RevealGroup
+            immediate
+            direction="x"
+            durationMs={DUR_SLIDE_MS}
+            staggerMs={STAGGER_CARDS_MS}
+            className="flex gap-4 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-2 lg:grid lg:grid-cols-4 lg:gap-5 lg:overflow-visible lg:pb-0 touch-pan-x"
           >
-            {HERO_DECK_CARDS.map((card, index) => (
-              <HeroFloatingCard
-                key={card.id}
-                card={card}
-                index={index}
-                hoveredIdx={hoveredIdx}
-                isActive={card.id === activeCardId}
-                prefersReducedMotion={prefersReducedMotion}
-                onHoverStart={() => {
-                  setHoveredIdx(index);
-                  setActiveCardId(card.id);
-                }}
-                onHoverEnd={() => {
-                  setHoveredIdx((prev) => (prev === index ? null : prev));
-                }}
-                onOpenDetail={(el) => {
-                  setActiveCardId(card.id);
-                  openDetail(buildOverlayPayloadFromHeroCard(card), el);
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Quiet Active Spotlight Caption Bar */}
-          <div className="mt-1 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-center">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeCard.id}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.25, ease: EASE_PRIMARY }}
-                className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-sm text-[#F8F6F0]/85"
-              >
-                <span className="text-[#E9A34A] font-semibold">{activeCard.category}</span>
-                <span aria-hidden="true" className="text-white/30">
-                  ·
-                </span>
-                <span className="text-white font-medium">{activeCard.title}</span>
-                <span aria-hidden="true" className="text-white/30">
-                  ·
-                </span>
-                <span>{activeCard.location}</span>
-                <span aria-hidden="true" className="text-white/30">
-                  ·
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => openDetail(buildOverlayPayloadFromHeroCard(activeCard), e.currentTarget)}
-                  className="text-[#8CC9E8] hover:text-white underline underline-offset-4 font-semibold inline-flex items-center gap-1 cursor-pointer min-h-[36px]"
+            {HERO_DECK_CARDS.map((card, index) => {
+              const isActive = card.id === activeCardId;
+              const isFlipped = flippedHeroCardId === card.id;
+              return (
+                <RevealItem
+                  key={card.id}
+                  index={index}
+                  className="snap-start shrink-0 w-[256px] sm:w-[276px] lg:w-auto flex"
                 >
-                  <span>Inspect destination</span>
-                  <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                </button>
-              </motion.div>
-            </AnimatePresence>
+                  <FlipCard
+                    isFlipped={isFlipped}
+                    onFlipChange={(next) => {
+                      setActiveCardId(card.id);
+                      setFlippedHeroCardId(next ? card.id : null);
+                    }}
+                    hoverFlipEnabled={entranceSettled}
+                    cardLabel={card.title}
+                    onFrontClick={(el) => {
+                      setActiveCardId(card.id);
+                      openDetail(buildOverlayPayloadFromHeroCard(card), el);
+                    }}
+                    className="w-full aspect-[4/5]"
+                    front={
+                      <div
+                        onMouseEnter={() => setActiveCardId(card.id)}
+                        className={`w-full h-full rounded-2xl overflow-hidden border bg-[#121716] transition-colors duration-200 ${
+                          isActive
+                            ? 'border-[#E9A34A]/80 shadow-[0_18px_40px_rgba(0,0,0,0.65)]'
+                            : 'border-white/18 shadow-[0_12px_28px_rgba(0,0,0,0.5)] hover:border-white/45'
+                        }`}
+                      >
+                        <SafeImage
+                          src={card.image}
+                          alt={`${card.title} — ${card.location}`}
+                          priority
+                          darkSkeleton
+                          className="ys-card-img w-full h-full object-cover"
+                        />
+                        <div
+                          className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/15 to-black/90 pointer-events-none"
+                          aria-hidden="true"
+                        />
+                        <div className="absolute top-3.5 left-4 right-14 pointer-events-none">
+                          <span className="inline-block px-2.5 py-0.5 rounded-md bg-black/55 backdrop-blur-xs text-[11px] font-semibold tracking-wide text-[#8CC9E8] leading-snug">
+                            {card.category}
+                          </span>
+                        </div>
+                        <div className="absolute bottom-4 left-4 right-4 space-y-1 pointer-events-none">
+                          <h2 className="font-editorial text-xl font-semibold text-white leading-snug">
+                            {card.title}
+                          </h2>
+                          <p className="text-xs sm:text-sm text-[#F8F6F0]/85 leading-snug">{card.location}</p>
+                        </div>
+                      </div>
+                    }
+                    back={
+                      <>
+                        <div className="space-y-2.5 pr-9">
+                          <p className="eyebrow-mono text-[#8CC9E8]">{card.category}</p>
+                          <h2 className="font-editorial text-lg font-semibold text-white leading-snug">
+                            {card.title}
+                          </h2>
+                          <p className="text-xs text-[#E9A34A] font-medium flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                            <span>Best time: {card.bestTime}</span>
+                          </p>
+                          <p className="text-xs sm:text-[13px] text-[#F8F6F0]/85 leading-relaxed">
+                            {card.description}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {card.highlights.slice(0, 3).map((tag) => (
+                              <span
+                                key={tag}
+                                className="px-2 py-0.5 rounded-md bg-white/10 border border-white/15 text-[11px] font-medium text-[#F8F6F0]/90"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDetail(buildOverlayPayloadFromHeroCard(card), e.currentTarget);
+                          }}
+                          className="ys-btn-primary w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[42px] rounded-xl bg-[#E9A34A] text-[#142322] text-sm font-bold hover:bg-[#DF9538] shrink-0"
+                        >
+                          <span>View details</span>
+                          <ArrowRight className="ys-arrow w-4 h-4" aria-hidden="true" />
+                        </button>
+                      </>
+                    }
+                  />
+                </RevealItem>
+              );
+            })}
+          </RevealGroup>
+
+          {/* Active Spotlight Caption */}
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-sm text-[#F8F6F0]/85 text-center">
+            <span className="text-[#E9A34A] font-semibold">{activeCard.category}</span>
+            <span aria-hidden="true" className="text-white/30">
+              ·
+            </span>
+            <span className="text-white font-medium">{activeCard.title}</span>
+            <span aria-hidden="true" className="text-white/30">
+              ·
+            </span>
+            <span>{activeCard.location}</span>
+            <span aria-hidden="true" className="text-white/30">
+              ·
+            </span>
+            <button
+              type="button"
+              onClick={(e) =>
+                openDetail(buildOverlayPayloadFromHeroCard(activeCard), e.currentTarget)
+              }
+              className="text-[#8CC9E8] hover:text-white underline underline-offset-4 font-semibold inline-flex items-center gap-1 cursor-pointer min-h-[36px]"
+            >
+              <span>Inspect destination</span>
+              <ArrowRight className="w-4 h-4" aria-hidden="true" />
+            </button>
           </div>
         </div>
       </div>
@@ -402,670 +364,678 @@ export function LandingHeroSection({ primaryCtaTo }: HeroSectionProps) {
   );
 }
 
-function MagneticCtaLink({ to, label }: { to: string; label: string }) {
-  const prefersReducedMotion = Boolean(useReducedMotion());
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const springX = useSpring(x, { stiffness: 260, damping: 20, mass: 0.4 });
-  const springY = useSpring(y, { stiffness: 260, damping: 20, mass: 0.4 });
-
-  const handleMove = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (prefersReducedMotion) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const dx = ((e.clientX - rect.left) / rect.width - 0.5) * 10;
-    const dy = ((e.clientY - rect.top) / rect.height - 0.5) * 6;
-    x.set(dx);
-    y.set(dy);
-  };
-
-  const handleLeave = () => {
-    x.set(0);
-    y.set(0);
-  };
-
-  return (
-    <motion.div
-      style={prefersReducedMotion ? undefined : { x: springX, y: springY }}
-      className="inline-block"
-    >
-      <Link
-        to={to}
-        onMouseMove={handleMove}
-        onMouseLeave={handleLeave}
-        className="group inline-flex items-center justify-center gap-2.5 px-8 py-4 min-h-[54px] rounded-full bg-[#E9A34A] text-[#142322] font-bold text-base sm:text-[17px] hover:bg-[#DF9538] active:scale-[0.98] transition-colors shadow-[0_14px_40px_rgba(233,163,74,0.28)] whitespace-nowrap"
-      >
-        <span>{label}</span>
-        <ArrowRight
-          className="w-5 h-5 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1"
-          aria-hidden="true"
-        />
-      </Link>
-    </motion.div>
-  );
-}
-
-function HeroFloatingCard({
-  card,
-  index,
-  hoveredIdx,
-  isActive,
-  prefersReducedMotion,
-  onHoverStart,
-  onHoverEnd,
-  onOpenDetail,
-}: {
-  card: HeroDeckCard;
-  index: number;
-  hoveredIdx: number | null;
-  isActive: boolean;
-  prefersReducedMotion: boolean;
-  onHoverStart: () => void;
-  onHoverEnd: () => void;
-  onOpenDetail: (el: HTMLElement) => void;
-}) {
-  const tiltRef = useRef<HTMLDivElement | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const targetTiltRef = useRef({ rx: 0, ry: 0 });
-  const currentTiltRef = useRef({ rx: 0, ry: 0 });
-
-  const baseRotate = GENTLE_FAN_ROTATIONS[index] ?? 0;
-  const baseY = GENTLE_FAN_OFFSETS[index] ?? 0;
-  const isHovered = hoveredIdx === index;
-
-  let neighborPushX = 0;
-  if (!prefersReducedMotion && hoveredIdx !== null && hoveredIdx !== index) {
-    const distance = Math.abs(index - hoveredIdx);
-    const direction = index < hoveredIdx ? -1 : 1;
-    if (distance === 1) neighborPushX = direction * 9;
-    else if (distance === 2) neighborPushX = direction * 4;
-  }
-
-  useEffect(() => {
-    return () => {
-      if (rafRef.current !== null) {
-        window.cancelAnimationFrame(rafRef.current);
-      }
-    };
-  }, []);
-
-  const scheduleTiltLoop = () => {
-    if (prefersReducedMotion || rafRef.current !== null) return;
-    const tick = () => {
-      const el = tiltRef.current;
-      if (!el) {
-        rafRef.current = null;
-        return;
-      }
-      const cur = currentTiltRef.current;
-      const tgt = targetTiltRef.current;
-      cur.rx += (tgt.rx - cur.rx) * 0.18;
-      cur.ry += (tgt.ry - cur.ry) * 0.18;
-
-      el.style.transform = `perspective(900px) rotateX(${cur.rx.toFixed(2)}deg) rotateY(${cur.ry.toFixed(2)}deg) translate3d(0,0,0)`;
-
-      if (Math.abs(tgt.rx - cur.rx) > 0.04 || Math.abs(tgt.ry - cur.ry) > 0.04) {
-        rafRef.current = window.requestAnimationFrame(tick);
-      } else {
-        cur.rx = tgt.rx;
-        cur.ry = tgt.ry;
-        el.style.transform =
-          tgt.rx === 0 && tgt.ry === 0
-            ? 'perspective(900px) rotateX(0deg) rotateY(0deg) translate3d(0,0,0)'
-            : `perspective(900px) rotateX(${tgt.rx.toFixed(2)}deg) rotateY(${tgt.ry.toFixed(2)}deg) translate3d(0,0,0)`;
-        rafRef.current = null;
-      }
-    };
-    rafRef.current = window.requestAnimationFrame(tick);
-  };
-
-  const handlePointerMove = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (prefersReducedMotion) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const px = (e.clientX - rect.left) / rect.width;
-    const py = (e.clientY - rect.top) / rect.height;
-    targetTiltRef.current = {
-      rx: (0.5 - py) * 10,
-      ry: (px - 0.5) * 10,
-    };
-    scheduleTiltLoop();
-  };
-
-  const handlePointerLeave = () => {
-    targetTiltRef.current = { rx: 0, ry: 0 };
-    scheduleTiltLoop();
-    onHoverEnd();
-  };
-
-  return (
-    <motion.div
-      initial={
-        prefersReducedMotion
-          ? { opacity: 1 }
-          : { opacity: 0, y: 40, rotate: baseRotate }
-      }
-      animate={{
-        opacity: 1,
-        x: neighborPushX,
-        y: prefersReducedMotion ? 0 : isHovered ? -14 : baseY,
-        rotate: prefersReducedMotion ? 0 : isHovered ? 0 : baseRotate,
-        scale: prefersReducedMotion ? 1 : isHovered ? 1.04 : hoveredIdx !== null ? 0.99 : 1,
-      }}
-      transition={{
-        opacity: {
-          duration: prefersReducedMotion ? 0.15 : 0.8,
-          delay: prefersReducedMotion ? 0 : index * 0.07,
-          ease: EASE_PRIMARY,
-        },
-        y: hoveredIdx === null
-          ? {
-              duration: prefersReducedMotion ? 0.15 : 0.8,
-              delay: prefersReducedMotion ? 0 : index * 0.07,
-              ease: EASE_PRIMARY,
-            }
-          : { type: 'spring', stiffness: 320, damping: 26, mass: 0.65 },
-        x: { type: 'spring', stiffness: 300, damping: 26, mass: 0.65 },
-        scale: { type: 'spring', stiffness: 320, damping: 25, mass: 0.6 },
-        rotate: { type: 'spring', stiffness: 280, damping: 26 },
-      }}
-      style={{ zIndex: isHovered ? 30 : isActive ? 20 : 10 + index }}
-      className="snap-start shrink-0 min-w-[150px] w-[166px] sm:w-[172px] xl:flex-1 xl:w-auto aspect-[3/4] will-change-transform"
-    >
-      <div
-        ref={tiltRef}
-        className="w-full h-full will-change-transform"
-        style={{ transform: 'perspective(900px) translate3d(0,0,0)' }}
-      >
-        <button
-          type="button"
-          onMouseEnter={onHoverStart}
-          onFocus={onHoverStart}
-          onMouseMove={handlePointerMove}
-          onMouseLeave={handlePointerLeave}
-          onBlur={onHoverEnd}
-          onClick={(e) => onOpenDetail(e.currentTarget)}
-          className={`group relative w-full h-full rounded-2xl overflow-hidden border text-left cursor-pointer transition-[border-color,box-shadow] duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E9A34A] bg-[#121716] ${
-            isHovered
-              ? 'border-[#E9A34A] shadow-[0_26px_55px_rgba(0,0,0,0.85)]'
-              : isActive
-              ? 'border-[#E9A34A]/65 shadow-[0_18px_42px_rgba(0,0,0,0.72)]'
-              : 'border-white/18 shadow-[0_14px_34px_rgba(0,0,0,0.6)] hover:border-white/45'
-          }`}
-        >
-          <SafeImage
-            src={card.image}
-            alt={`${card.title} — ${card.location}`}
-            priority
-            darkSkeleton
-            className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.08]"
-          />
-          <div
-            className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/10 to-black/90 pointer-events-none"
-            aria-hidden="true"
-          />
-          <div className="absolute top-3 left-3 right-3 pointer-events-none">
-            <span className="inline-block max-w-full truncate text-[12.5px] font-medium tracking-wide text-[#8CC9E8] drop-shadow-sm">
-              {card.category}
-            </span>
-          </div>
-          <div className="absolute bottom-3.5 left-3.5 right-3.5 pointer-events-none">
-            <p className="font-editorial text-[18px] sm:text-[19px] font-semibold text-white leading-[1.18] line-clamp-2 drop-shadow-sm">
-              {card.title}
-            </p>
-          </div>
-        </button>
-      </div>
-    </motion.div>
-  );
-}
-
 /* --------------------------------------------------------------------------
- * SECTION 1 — DISCOVER INDIA ("Every journey has a story.")
- * Scroll-driven transformation from compact fanned stack -> separated editorial gallery
+ * SECTION 1 — DISCOVER INDIA BY BROAD TRAVEL CATEGORIES
+ * 8 broad categories spanning India, expandable destination drawer, horizontal reveal
  * -------------------------------------------------------------------------- */
 
-const STORY_CARDS = [
+interface BroadCategoryDestination {
+  name: string;
+  region: string;
+  note: string;
+  exploreTo: string;
+  travelAssistTo: string;
+  destId?: string;
+}
+
+interface BroadCategoryCard {
+  id: string;
+  title: string;
+  subtitle: string;
+  regionsTag: string;
+  image: string;
+  featuredDestinations: BroadCategoryDestination[];
+}
+
+const INDIA_BROAD_CATEGORIES: BroadCategoryCard[] = [
   {
-    id: 'story-puri',
-    title: 'Shri Jagannath Temple',
-    place: 'Puri, Odisha',
-    tag: 'Sacred Kalinga Architecture',
+    id: 'temples-spiritual',
+    title: 'Temples & Spiritual Journeys',
+    subtitle: 'Sacred shrines, darshan corridors & riverside aarti ghats',
+    regionsTag: 'Puri · Rishikesh · Katra · Varanasi',
     image: IMAGES.jagannathTemple,
-    destLink: '/explore',
-    destId: 'udaipur',
-    description:
-      'Iconic 12th-century temple complex along Grand Road in Puri, surrounded by heritage mutts and coastal promenades.',
+    featuredDestinations: [
+      {
+        name: 'Puri (Shri Jagannath Temple)',
+        region: 'Odisha',
+        note: 'Early-morning darshan along Grand Road with prepaid auto booths outside Puri Station.',
+        exploreTo: '/explore?category=Temples%20%26%20Spiritual%20Journeys',
+        travelAssistTo: '/travel-assist?state=Odisha',
+      },
+      {
+        name: 'Varanasi (Kashi Vishwanath & Ghats)',
+        region: 'Uttar Pradesh',
+        note: 'Old-city lane access stops near Godowlia Chowk; verify Ganga aarti arrival timings beforehand.',
+        exploreTo: '/travel-assist?state=Uttar%20Pradesh',
+        travelAssistTo: '/travel-assist?state=Uttar%20Pradesh',
+      },
+      {
+        name: 'Katra & Vaishno Devi Bhawan',
+        region: 'Jammu & Kashmir',
+        note: 'SVDK Rail & Katra Bus Stand connect to Banganga & Tarakote pilgrimage gates.',
+        exploreTo: '/explore?dest=katra-jammu',
+        travelAssistTo: '/travel-assist?state=Jammu%20and%20Kashmir',
+        destId: 'katra-jammu',
+      },
+    ],
   },
   {
-    id: 'story-udaipur',
-    title: 'Lake Pichola & Palaces',
-    place: 'Udaipur, Rajasthan',
-    tag: 'Waterfront Heritage',
-    image: IMAGES.udaipurHero,
-    destLink: '/explore?dest=udaipur',
-    destId: 'udaipur',
-    description:
-      'Lakeside Mewar palaces, narrow Chandpole lanes, and sunset ghats framed by Aravalli peaks.',
+    id: 'mountains-hills',
+    title: 'Mountains & Hill Stations',
+    subtitle: 'Himalayan pine valleys, high passes & misty Northeast ridges',
+    regionsTag: 'Manali · Spiti · Meghalaya · Patnitop',
+    image: IMAGES.manaliValley,
+    featuredDestinations: [
+      {
+        name: 'Manali & Old Manali Ridge',
+        region: 'Himachal Pradesh',
+        note: 'Cedar groves above Manalsu bridge with local union taxi guidance and HRTC tips.',
+        exploreTo: '/explore?dest=manali',
+        travelAssistTo: '/travel-assist?dest=manali',
+        destId: 'manali',
+      },
+      {
+        name: 'Spiti & Solang Mountain Passes',
+        region: 'Himachal Pradesh',
+        note: 'High-altitude valley roads with seasonal pass timing and acclimatization planning.',
+        exploreTo: '/explore?dest=manali',
+        travelAssistTo: '/travel-assist?state=Himachal%20Pradesh',
+        destId: 'manali',
+      },
+      {
+        name: 'Shillong & Cherrapunji Ridges',
+        region: 'Meghalaya · Northeast India',
+        note: 'Cloud-draped Khasi plateaus, canyon viewpoints, and daytime inter-valley cab connections.',
+        exploreTo: '/travel-assist?state=Meghalaya',
+        travelAssistTo: '/travel-assist?state=Meghalaya',
+      },
+    ],
   },
   {
-    id: 'story-rishikesh',
-    title: 'Ganga Himalayan Foothills',
-    place: 'Rishikesh, Uttarakhand',
-    tag: 'River & Forest Trails',
-    image: IMAGES.rishikeshGanga,
-    destLink: '/explore?dest=rishikesh',
-    destId: 'rishikesh',
-    description:
-      'Emerald river rapids, pedestrian ghats around Ram Jhula, and serene forested ashram walks.',
-  },
-  {
-    id: 'story-alleppey',
-    title: 'Kuttanad Palm Canals',
-    place: 'Alleppey, Kerala',
-    tag: 'Public Ferry Backwaters',
-    image: IMAGES.alleppeyBackwaters,
-    destLink: '/explore?dest=alleppey',
-    destId: 'alleppey',
-    description:
-      'Below-sea-level rice paddies and coconut-lined canals served daily by ₹15 public SWTD wooden ferries.',
-  },
-  {
-    id: 'story-coast',
-    title: 'Indian Golden Shorelines',
-    place: 'Odisha & Konkan Coast',
-    tag: 'Quiet Dusk Horizons',
+    id: 'beaches-coastal',
+    title: 'Beaches & Coastal Escapes',
+    subtitle: 'Dawn promenades, laterite sea cliffs & quiet coastal coves',
+    regionsTag: 'Puri Coast · Goa · Varkala · Kerala',
     image: IMAGES.indianBeach,
-    destLink: '/explore',
-    destId: 'alleppey',
-    description:
-      'Unrushed coastal evenings where fishermen haul wooden boats ashore beneath soft amber twilight.',
+    featuredDestinations: [
+      {
+        name: 'Puri Golden Beach & Seafront',
+        region: 'Odisha Coast',
+        note: 'Clean sunrise shorelines along Marine Drive away from congested bazaar lanes.',
+        exploreTo: '/travel-assist?state=Odisha',
+        travelAssistTo: '/travel-assist?state=Odisha',
+      },
+      {
+        name: 'Varkala Cliff & Marari Shores',
+        region: 'Kerala',
+        note: 'Dramatic red laterite sea cliffs and quiet Arabian Sea beaches reachable via Alleppey or Varkala rail.',
+        exploreTo: '/explore?dest=alleppey',
+        travelAssistTo: '/travel-assist?dest=alleppey',
+        destId: 'alleppey',
+      },
+      {
+        name: 'Palolem & South Goa Coves',
+        region: 'Goa',
+        note: 'Calm southern coves accessed via Madgaon Junction with state-regulated taxi & pilot stands.',
+        exploreTo: '/travel-assist?state=Goa',
+        travelAssistTo: '/travel-assist?state=Goa',
+      },
+    ],
+  },
+  {
+    id: 'heritage-palaces',
+    title: 'Heritage & Royal Palaces',
+    subtitle: 'Sandstone citadels, boulder ruins & Walled City architecture',
+    regionsTag: 'Jaipur · Udaipur · Hampi · Jammu',
+    image: IMAGES.hawaMahal,
+    featuredDestinations: [
+      {
+        name: 'Jaipur Walled City & Hawa Mahal',
+        region: 'Rajasthan',
+        note: '953 jharokha windows, Badi Chaupar Metro access, and composite monument passes.',
+        exploreTo: '/explore?dest=jaipur',
+        travelAssistTo: '/travel-assist?dest=jaipur',
+        destId: 'jaipur',
+      },
+      {
+        name: 'Udaipur City Palace',
+        region: 'Rajasthan',
+        note: '11 interconnected Mewar courtyards with daytime old-city cab restrictions.',
+        exploreTo: '/explore?dest=udaipur',
+        travelAssistTo: '/travel-assist?dest=udaipur',
+        destId: 'udaipur',
+      },
+      {
+        name: 'Hampi Vijayanagara Precinct',
+        region: 'Karnataka',
+        note: 'Sprawling stone chariot complexes and boulder hilltops best timed before midday heat.',
+        exploreTo: '/travel-assist?state=Karnataka',
+        travelAssistTo: '/travel-assist?state=Karnataka',
+      },
+    ],
+  },
+  {
+    id: 'nature-wildlife',
+    title: 'Nature & Wildlife',
+    subtitle: 'Biosphere reserves, living root hills & forest sanctuaries',
+    regionsTag: 'Meghalaya · Kaziranga · Corbett · Periyar',
+    image: IMAGES.natureWildlife,
+    featuredDestinations: [
+      {
+        name: 'Northeast & Kaziranga Corridor',
+        region: 'Assam & Meghalaya',
+        note: 'Brahmaputra floodplains, subtropical forests, and clear winter wildlife viewing windows.',
+        exploreTo: '/travel-assist?state=Assam',
+        travelAssistTo: '/travel-assist?state=Assam',
+      },
+      {
+        name: 'Uttarakhand Himalayan Foothills',
+        region: 'Uttarakhand',
+        note: 'Sal forest belts and riverside wildlife corridors near Dehradun and Rishikesh.',
+        exploreTo: '/explore?dest=rishikesh',
+        travelAssistTo: '/travel-assist?state=Uttarakhand',
+        destId: 'rishikesh',
+      },
+      {
+        name: 'Kerala Green Sanctuary Belt',
+        region: 'Kerala',
+        note: 'Spice hills, birding wetlands around Kumarakom, and Periyar forest trails.',
+        exploreTo: '/explore?dest=alleppey',
+        travelAssistTo: '/travel-assist?state=Kerala',
+        destId: 'alleppey',
+      },
+    ],
+  },
+  {
+    id: 'adventure-experiences',
+    title: 'Adventure & Experiences',
+    subtitle: 'White-water rafting, paragliding ridges & alpine treks',
+    regionsTag: 'Rishikesh · Bir Billing · Manali · Zanskar',
+    image: IMAGES.adventureRafting,
+    featuredDestinations: [
+      {
+        name: 'Shivpuri Ganga Rapids, Rishikesh',
+        region: 'Uttarakhand',
+        note: 'Certified Grade II–III river rafting runs with clear safety gear and shuttle pickup notes.',
+        exploreTo: '/explore?dest=rishikesh',
+        travelAssistTo: '/travel-assist?dest=rishikesh',
+        destId: 'rishikesh',
+      },
+      {
+        name: 'Hampta & Bhrigu Valley Trails',
+        region: 'Himachal Pradesh',
+        note: 'Guided high-meadow day hikes near Manali with seasonal snow-clearance guidance.',
+        exploreTo: '/explore?dest=manali',
+        travelAssistTo: '/travel-assist?dest=manali',
+        destId: 'manali',
+      },
+      {
+        name: 'Bir Billing Thermal Ridge',
+        region: 'Himachal Pradesh',
+        note: 'World-renowned paragliding takeoff plateau with verified landing zone drops.',
+        exploreTo: '/explore?dest=manali',
+        travelAssistTo: '/travel-assist?state=Himachal%20Pradesh',
+        destId: 'manali',
+      },
+    ],
+  },
+  {
+    id: 'lakes-backwaters',
+    title: 'Lakes & Backwaters',
+    subtitle: 'Public ferry canals, palace lakes & tranquil mountain waters',
+    regionsTag: 'Kerala · Udaipur · Mansar · Nainital',
+    image: IMAGES.alleppeyBackwaters,
+    featuredDestinations: [
+      {
+        name: 'Alleppey & Kuttanad Backwaters',
+        region: 'Kerala',
+        note: 'Navigate emerald village canals via public Kerala SWTD wooden ferries and small shikaras; confirm jetty timetables locally.',
+        exploreTo: '/explore?dest=alleppey',
+        travelAssistTo: '/travel-assist?dest=alleppey',
+        destId: 'alleppey',
+      },
+      {
+        name: 'Lake Pichola & Fateh Sagar',
+        region: 'Udaipur, Rajasthan',
+        note: 'Ghat-side promenades and sunset island views across the southern Aravallis.',
+        exploreTo: '/explore?dest=udaipur',
+        travelAssistTo: '/travel-assist?dest=udaipur',
+        destId: 'udaipur',
+      },
+      {
+        name: 'Mansar Lake Foothill Basin',
+        region: 'Jammu, J&K',
+        note: 'Peaceful forest-lined oval lake ~62 km east of Jammu Tawi station.',
+        exploreTo: '/travel-assist?state=Jammu%20and%20Kashmir',
+        travelAssistTo: '/travel-assist?state=Jammu%20and%20Kashmir',
+      },
+    ],
+  },
+  {
+    id: 'cafes-local-food',
+    title: 'Cafes & Local Food',
+    subtitle: 'Honest rooftop chai decks, bakeries & solo-friendly tables',
+    regionsTag: 'Jaipur · Old Manali · Rishikesh · Kochi',
+    image: IMAGES.cafeRooftop,
+    featuredDestinations: [
+      {
+        name: 'Walled City Rooftops, Jaipur',
+        region: 'Rajasthan',
+        note: 'Sandstone terraces facing Hawa Mahal with relaxed daytime menus and metro access.',
+        exploreTo: '/explore?dest=jaipur',
+        travelAssistTo: '/travel-assist?dest=jaipur',
+        destId: 'jaipur',
+      },
+      {
+        name: 'Manalsu Riverside Cafes, Manali',
+        region: 'Himachal Pradesh',
+        note: 'Pine-wood decks overlooking cedar hills with reliable power and calm acoustic vibes.',
+        exploreTo: '/explore?dest=manali',
+        travelAssistTo: '/travel-assist?dest=manali',
+        destId: 'manali',
+      },
+      {
+        name: 'Tapovan & Laxman Jhula Decks',
+        region: 'Rishikesh, Uttarakhand',
+        note: 'River-view bakeries and quiet morning coffee terraces along the upper Ganga bend.',
+        exploreTo: '/explore?dest=rishikesh',
+        travelAssistTo: '/travel-assist?dest=rishikesh',
+        destId: 'rishikesh',
+      },
+    ],
   },
 ];
 
 export function DiscoverIndiaStorySection() {
-  const prefersReducedMotion = Boolean(useReducedMotion());
   const { openDetail } = useDetailOverlay();
-  const sectionRef = useRef<HTMLElement | null>(null);
-  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(INDIA_BROAD_CATEGORIES[0].id);
+  const [expandedAll, setExpandedAll] = useState<boolean>(true);
 
-  const stageWidth = useMeasuredWidth(stageRef, 1240);
+  const visibleCategories = expandedAll
+    ? INDIA_BROAD_CATEGORIES
+    : INDIA_BROAD_CATEGORIES.slice(0, 4);
 
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ['start 0.25', 'end end'],
-  });
+  const activeCategory =
+    INDIA_BROAD_CATEGORIES.find((c) => c.id === selectedCategoryId) || INDIA_BROAD_CATEGORIES[0];
 
-  const smoothProgress = useSpring(scrollYProgress, SCROLL_SPRING);
-  const activeProgress = prefersReducedMotion ? scrollYProgress : smoothProgress;
-
-  const bgGlowOpacity = useTransform(activeProgress, [0, 0.55, 1], [0.08, 0.45, 0.24]);
-  const headlineY = useTransform(activeProgress, [0, 0.35], [22, 0]);
-  const subHeadlineOpacity = useTransform(activeProgress, [0.08, 0.48], [0.45, 1]);
-
-  const count = STORY_CARDS.length;
-  const targetGap = stageWidth >= 1180 ? 22 : stageWidth >= 1020 ? 18 : 14;
-  const maxCardWidth = 232;
-  const cardWidth = Math.max(
-    160,
-    Math.min(maxCardWidth, Math.floor((stageWidth - (count - 1) * targetGap) / count))
-  );
-  const initialStep = Math.round(cardWidth * 0.22);
-  const finalStep = cardWidth + targetGap;
-
-  const openStoryOverlay = (card: (typeof STORY_CARDS)[number], el: HTMLElement) => {
-    openDetail(
-      {
-        kind: 'place',
-        id: card.id,
-        layoutId: `story-card-${card.id}`,
-        title: card.title,
-        category: card.tag,
-        location: card.place,
-        image: card.image,
-        description: card.description,
-        highlights: [card.tag, 'Ground-Checked Tips', 'Local Ride Estimates'],
-        destinationId: card.destId,
-        detailRoute: card.destLink,
-      },
-      el
-    );
+  const handleCategoryClick = (cat: BroadCategoryCard, el: HTMLElement) => {
+    setSelectedCategoryId(cat.id);
+    if (el) {
+      el.blur();
+    }
   };
 
   return (
-    <section
-      ref={sectionRef}
-      className="relative bg-[#0B0E0D] text-[#F8F6F0] lg:min-h-[215vh]"
-    >
-      <div
-        className="absolute inset-0 pointer-events-none bg-editorial-grain opacity-65"
-        aria-hidden="true"
-      />
-      {/* Subtle Scroll-Shifting Deep Teal Ambient Transition */}
-      <motion.div
-        style={{ opacity: prefersReducedMotion ? 0.2 : bgGlowOpacity }}
-        className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_60%_at_50%_50%,rgba(18,61,58,0.85),transparent_75%)]"
-        aria-hidden="true"
-      />
-
-      <div className="lg:sticky lg:top-[72px] lg:min-h-[calc(100vh-72px)] flex flex-col justify-center py-20 lg:py-10 overflow-x-clip">
-        <div className="relative z-10 max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 w-full space-y-10 lg:space-y-12">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end">
-            <motion.div
-              style={{ y: prefersReducedMotion ? 0 : headlineY }}
-              className="lg:col-span-7 space-y-3"
-            >
-              <p className="eyebrow-mono text-[#8CC9E8]">
-                01. Discover India
-              </p>
-              <h2 className="font-editorial text-4xl sm:text-5xl lg:text-[58px] font-semibold text-white leading-[1.06] text-balance">
-                Every journey has a <span className="text-[#E9A34A] italic font-normal">story</span>.
-              </h2>
-            </motion.div>
-
-            <motion.p
-              style={{ opacity: prefersReducedMotion ? 1 : subHeadlineOpacity }}
-              className="lg:col-span-5 text-base sm:text-lg text-[#F8F6F0]/78 leading-relaxed max-w-[55ch]"
-            >
-              From dawn temple courtyards in Puri to quiet backwater ferries in Kerala—see each destination in full light before packing a single bag.
-            </motion.p>
+    <section className="relative bg-[#0B0E0D] text-[#F8F6F0] py-20 sm:py-24 overflow-x-clip border-t border-white/10">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+        <Reveal className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+          <div className="space-y-3 max-w-2xl">
+            <p className="eyebrow-mono text-[#8CC9E8]">01. Across India</p>
+            <h2 className="font-editorial text-3xl sm:text-5xl font-semibold text-white leading-[1.1] text-balance">
+              Explore India by how you want to{' '}
+              <span className="text-[#E9A34A] italic font-normal">travel</span>.
+            </h2>
+            <p className="text-base sm:text-lg text-[#F8F6F0]/80 leading-relaxed max-w-[58ch]">
+              From Himalayan passes and temple towns to wildlife reserves and coastal backwaters — pick any travel theme to explore connected destinations across India.
+            </p>
           </div>
 
-          {/* Desktop Scroll-Driven Spread Transformation */}
-          <div
-            ref={stageRef}
-            className="hidden lg:flex items-center justify-center relative h-[360px] xl:h-[390px]"
-          >
-            {STORY_CARDS.map((card, i) => (
-              <StorySpreadCard
-                key={card.id}
-                card={card}
-                index={i}
-                total={count}
-                cardWidth={cardWidth}
-                initialStep={initialStep}
-                finalStep={finalStep}
-                scrollProgress={activeProgress}
-                prefersReducedMotion={prefersReducedMotion}
-                onOpen={(el) => openStoryOverlay(card, el)}
-              />
-            ))}
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => setExpandedAll((prev) => !prev)}
+              className="ys-chip px-4 py-2.5 min-h-[42px] rounded-full border border-white/25 bg-white/5 hover:bg-white/10 text-sm font-semibold text-white transition-colors cursor-pointer"
+            >
+              {expandedAll ? 'Show Compact Row (4)' : `Show All ${INDIA_BROAD_CATEGORIES.length} Categories`}
+            </button>
+            <Link
+              to="/explore"
+              className="ys-btn-primary inline-flex items-center gap-2 px-5 py-2.5 min-h-[42px] rounded-full bg-[#E9A34A] text-[#142322] font-bold text-sm hover:bg-[#DF9538] transition-colors"
+            >
+              <span>Browse All Destinations</span>
+              <ArrowRight className="ys-arrow w-4 h-4" aria-hidden="true" />
+            </Link>
           </div>
+        </Reveal>
 
-          {/* Mobile/Tablet Story Grid */}
-          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {STORY_CARDS.map((card) => (
-              <button
-                key={`sm-${card.id}`}
-                type="button"
-                onClick={(e) => openStoryOverlay(card, e.currentTarget)}
-                className="group relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/15 bg-[#121615] text-left cursor-pointer"
+        {/* Aligned Broad Category Cards — Once-Only Horizontal Reveal */}
+        <RevealGroup
+          direction="x"
+          durationMs={DUR_SLIDE_MS}
+          staggerMs={STAGGER_CARDS_MS}
+          retriggerKey={expandedAll ? 'all' : 'compact'}
+          className="flex gap-4 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-2 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-5 sm:overflow-visible sm:pb-0 touch-pan-x"
+        >
+          {visibleCategories.map((cat, idx) => {
+            const isSelected = cat.id === activeCategory.id;
+            return (
+              <RevealItem
+                key={cat.id}
+                index={idx}
+                className="snap-start shrink-0 w-[262px] sm:w-auto flex"
               >
-                <SafeImage
-                  src={card.image}
-                  alt={`${card.title} — ${card.place}`}
-                  darkSkeleton
-                  className="w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/25 to-transparent" />
-                <div className="absolute bottom-4 left-4 right-4">
-                  <p className="text-sm text-[#E9A34A] font-medium">{card.tag}</p>
-                  <h3 className="font-editorial text-xl font-semibold text-white mt-0.5">
-                    {card.title}
-                  </h3>
-                  <p className="text-sm text-[#F8F6F0]/80 mt-0.5">{card.place}</p>
-                </div>
-              </button>
-            ))}
+                <button
+                  type="button"
+                  onClick={(e) => handleCategoryClick(cat, e.currentTarget)}
+                  aria-pressed={isSelected}
+                  className={`ys-card ys-card-dark group relative w-full aspect-[4/3] rounded-2xl overflow-hidden border text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9A34A] bg-[#121615] ${
+                    isSelected
+                      ? 'border-[#E9A34A] ring-2 ring-[#E9A34A]/35 shadow-[0_18px_40px_rgba(0,0,0,0.6)]'
+                      : 'border-white/18 hover:border-white/45 shadow-[0_12px_30px_rgba(0,0,0,0.45)]'
+                  }`}
+                >
+                  <SafeImage
+                    src={cat.image}
+                    alt={`${cat.title} across India`}
+                    darkSkeleton
+                    className="ys-card-img w-full h-full object-cover"
+                  />
+                  <div
+                    className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/35 to-black/15 pointer-events-none"
+                    aria-hidden="true"
+                  />
+                  <div className="absolute top-3.5 left-4 right-4 flex items-center justify-between gap-2 pointer-events-none">
+                    <span className="text-xs font-semibold tracking-wide text-[#8CC9E8] truncate">
+                      {cat.regionsTag}
+                    </span>
+                  </div>
+                  <div className="absolute bottom-4 left-4 right-4 space-y-1 pointer-events-none">
+                    <h3 className="font-editorial text-lg sm:text-xl font-semibold text-white leading-snug">
+                      {cat.title}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-[#F8F6F0]/80 leading-snug line-clamp-2">
+                      {cat.subtitle}
+                    </p>
+                  </div>
+                </button>
+              </RevealItem>
+            );
+          })}
+        </RevealGroup>
+
+        {/* Connected Indian Destinations Drawer for Active Category */}
+        <Reveal
+          retriggerKey={activeCategory.id}
+          immediate
+          className="rounded-2xl border border-white/15 bg-[#121716] p-5 sm:p-6 space-y-5"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-4">
+            <div>
+              <p className="eyebrow-mono text-[#E9A34A]">Selected Category</p>
+              <h3 className="font-editorial text-xl sm:text-2xl font-semibold text-white">
+                {activeCategory.title}
+              </h3>
+            </div>
+            <p className="text-sm text-[#F8F6F0]/75 max-w-md">
+              Select a connected destination to plan multi-stop routes or launch Smart Local Hop directly.
+            </p>
           </div>
-        </div>
+
+          <RevealGroup
+            retriggerKey={activeCategory.id}
+            immediate
+            staggerMs={STAGGER_CARDS_MS}
+            className="grid grid-cols-1 md:grid-cols-3 gap-4"
+          >
+            {activeCategory.featuredDestinations.map((dest, idx) => (
+              <RevealItem key={dest.name} index={idx} className="h-full">
+                <MotionCard
+                  dark
+                  className="h-full rounded-xl border border-white/12 bg-[#161D1B] p-4 flex flex-col justify-between gap-3 hover:border-[#E9A34A]/50"
+                >
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#8CC9E8]">
+                      {dest.region}
+                    </p>
+                    <h4 className="font-editorial text-lg font-semibold text-white leading-snug">
+                      {dest.name}
+                    </h4>
+                    <p className="text-sm text-[#F8F6F0]/75 leading-relaxed">{dest.note}</p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={(e) =>
+                        openDetail(
+                          {
+                            kind: 'place',
+                            id: `${activeCategory.id}-${dest.name}`,
+                            title: dest.name,
+                            category: activeCategory.title,
+                            location: dest.region,
+                            image: activeCategory.image,
+                            description: dest.note,
+                            highlights: [activeCategory.title, 'Ground-Checked Tips', 'Ride & Route Ready'],
+                            destinationId: dest.destId || 'udaipur',
+                            detailRoute: dest.exploreTo,
+                          },
+                          e.currentTarget
+                        )
+                      }
+                      className="ys-chip px-3 py-2 rounded-lg bg-white/10 hover:bg-white/18 text-xs sm:text-sm font-semibold text-white transition-colors cursor-pointer"
+                    >
+                      Preview
+                    </button>
+                    <Link
+                      to={dest.exploreTo}
+                      className="ys-btn-primary px-3 py-2 rounded-lg bg-[#E9A34A] hover:bg-[#DF9538] text-xs sm:text-sm font-bold text-[#142322]"
+                    >
+                      Explore &amp; Plan
+                    </Link>
+                    <Link
+                      to={dest.travelAssistTo}
+                      className="ys-chip px-3 py-2 rounded-lg border border-white/20 hover:border-[#8CC9E8] text-xs sm:text-sm font-semibold text-[#8CC9E8] transition-colors"
+                    >
+                      Travel Assist
+                    </Link>
+                  </div>
+                </MotionCard>
+              </RevealItem>
+            ))}
+          </RevealGroup>
+        </Reveal>
       </div>
     </section>
   );
 }
 
-function StorySpreadCard({
-  card,
-  index,
-  total,
-  cardWidth,
-  initialStep,
-  finalStep,
-  scrollProgress,
-  prefersReducedMotion,
-  onOpen,
-}: {
-  card: (typeof STORY_CARDS)[number];
-  index: number;
-  total: number;
-  cardWidth: number;
-  initialStep: number;
-  finalStep: number;
-  scrollProgress: MotionValue<number>;
-  prefersReducedMotion: boolean;
-  onOpen: (el: HTMLElement) => void;
-}) {
-  const centerIdx = (total - 1) / 2;
-  const dist = index - centerIdx;
-  const absDist = Math.abs(dist);
-  const isCenter = index === 2;
-  const isInnerPair = index === 1 || index === 3;
-
-  const x = useTransform(
-    scrollProgress,
-    [0, 0.12, 0.76, 1],
-    [dist * initialStep, dist * (initialStep * 1.35), dist * finalStep, dist * finalStep]
-  );
-  const rotate = useTransform(
-    scrollProgress,
-    [0, 0.12, 0.76, 1],
-    [dist * 5.2, dist * 4.2, 0, 0]
-  );
-  const startScale = isCenter ? 0.96 : isInnerPair ? 0.91 : 0.86;
-  const endScale = isCenter ? 1.03 : 0.99;
-  const scale = useTransform(
-    scrollProgress,
-    [0, 0.12, 0.76, 1],
-    [startScale, startScale + 0.02, endScale, endScale]
-  );
-  const startY = absDist * 14;
-  const endY = isCenter ? -6 : isInnerPair ? 6 : -2;
-  const y = useTransform(
-    scrollProgress,
-    [0, 0.12, 0.76, 1],
-    [startY, startY * 0.8, endY, endY]
-  );
-
-  const baseZIndex = isCenter ? 30 : isInnerPair ? 22 + index : 14 + index;
-
-  return (
-    <motion.div
-      style={{
-        width: cardWidth,
-        x: prefersReducedMotion ? dist * finalStep : x,
-        y: prefersReducedMotion ? endY : y,
-        rotate: prefersReducedMotion ? 0 : rotate,
-        scale: prefersReducedMotion ? 1 : scale,
-        zIndex: baseZIndex,
-      }}
-      className="absolute aspect-[3/4] will-change-transform"
-    >
-      <motion.button
-        type="button"
-        onClick={(e) => onOpen(e.currentTarget)}
-        whileHover={prefersReducedMotion ? undefined : { y: -12, scale: 1.035 }}
-        transition={{ duration: 0.35, ease: EASE_PRIMARY }}
-        className="group block w-full h-full relative rounded-2xl overflow-hidden border border-white/20 hover:border-[#E9A34A]/65 shadow-[0_24px_65px_rgba(0,0,0,0.75)] bg-[#141817] transition-[border-color] duration-300 text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9A34A]"
-      >
-        <SafeImage
-          src={card.image}
-          alt={`${card.title} — ${card.place}`}
-          darkSkeleton
-          className="w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
-        <div className="absolute bottom-4 left-4 right-4 space-y-1">
-          <p className="text-sm font-medium text-[#E9A34A]">{card.tag}</p>
-          <h3 className="font-editorial text-lg xl:text-xl font-semibold text-white leading-snug">
-            {card.title}
-          </h3>
-          <p className="text-sm text-[#F8F6F0]/80">{card.place}</p>
-        </div>
-      </motion.button>
-    </motion.div>
-  );
-}
-
 /* --------------------------------------------------------------------------
- * SECTION 2 — FIND YOUR WAY ("Reach every place with confidence.")
- * Travel Assist showcase with layered station plaza & Bike / Auto / Cab stack
+ * SECTION 2 — SMART LOCAL HOP ("Every local journey, with more confidence.")
  * -------------------------------------------------------------------------- */
 
-const VEHICLE_SHOWCASE = [
+const SMART_HOP_SHOWCASE = [
   {
-    id: 'bike',
-    label: 'Bike Taxi',
-    note: 'Quick narrow-lane arrival',
-    vehicleImg: IMAGES.vehicleBikeTaxi,
+    id: 'fair-fare-voice',
+    badge: '01 · Fair Fare & Voice',
+    label: 'Fair Fare & Local Voice Pass',
+    note: 'Honest local fare ranges & driver phrase pass',
+    image: IMAGES.vehicleAutoRickshaw,
+    explanation:
+      'Transparent regional rate breakdowns for Auto, Cab & Bike paired with a polite, speakable local-language pass.',
+    metrics: [
+      { label: 'Modes', value: 'Auto · Cab · Bike' },
+      { label: 'Voice Pass', value: 'Hindi + Regional' },
+      { label: 'Labeling', value: 'Verified vs Estimate' },
+    ],
   },
   {
-    id: 'auto',
-    label: 'Auto-Rickshaw',
-    note: 'Short city & bazaar hops',
-    vehicleImg: IMAGES.vehicleAutoRickshaw,
+    id: 'timing-crowd-clock',
+    badge: '02 · Timing & Buffers',
+    label: 'Timing & Crowd Clock',
+    note: 'Live ETA vs closing hours & return trains',
+    image: IMAGES.travelAssistHeroCorridor,
+    explanation:
+      'Combines travel time with walking & darshan buffers to warn you early if an attraction or train window is tight.',
+    metrics: [
+      { label: 'Status', value: 'Safe · Hurry · Risk' },
+      { label: 'Return Check', value: 'Train & Bus Cutoff' },
+      { label: 'Crowd Data', value: 'Honest Status Only' },
+    ],
   },
   {
-    id: 'cab',
-    label: 'AC Sedan Cab',
-    note: 'Airport & luggage comfort',
-    vehicleImg: IMAGES.vehicleSedanCab,
+    id: 'zero-detour-pitstops',
+    badge: '03 · Route Corridor',
+    label: 'Zero-Detour En-route Pitstops',
+    note: 'Pure veg, ATMs & pharmacies on your route',
+    image: IMAGES.cafeMountain,
+    explanation:
+      'Finds essentials strictly along your actual road geometry and measures true detour distance without backtracking.',
+    metrics: [
+      { label: 'Filters', value: 'Pure Veg · ATM · Meds' },
+      { label: 'Ordering', value: 'Along Your Route' },
+      { label: 'Detour Check', value: 'Road-Measured' },
+    ],
   },
 ];
 
 export function FindYourWaySection() {
-  const prefersReducedMotion = Boolean(useReducedMotion());
-  const ref = useRef<HTMLElement | null>(null);
-
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ['start end', 'end start'],
-  });
-
-  const smoothProgress = useSpring(scrollYProgress, SCROLL_SPRING);
-  const activeProgress = prefersReducedMotion ? scrollYProgress : smoothProgress;
-
-  const mainPhotoScale = useTransform(activeProgress, [0.05, 0.55], [1.08, 1.0]);
-  const card0Y = useTransform(activeProgress, [0.1, 0.7], [42, -20]);
-  const card1Y = useTransform(activeProgress, [0.1, 0.7], [62, -34]);
-  const card2Y = useTransform(activeProgress, [0.1, 0.7], [82, -14]);
-  const cardOffsets = [card0Y, card1Y, card2Y];
+  const [flippedHopId, setFlippedHopId] = useState<string | null>(null);
 
   return (
-    <section
-      ref={ref}
-      className="relative py-24 sm:py-32 bg-gradient-to-b from-[#0B0E0D] via-[#0E1211] to-[#0A0D0C] text-[#F8F6F0] overflow-x-clip"
-    >
-      <div
-        className="absolute inset-0 pointer-events-none bg-editorial-grain opacity-65"
-        aria-hidden="true"
-      />
+    <section className="relative py-20 sm:py-24 bg-[#0D1110] text-[#F8F6F0] overflow-x-clip border-t border-white/10">
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-14 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
           {/* Left Editorial Column */}
-          <Reveal className="lg:col-span-5 space-y-6">
-            <p className="eyebrow-mono text-[#E9A34A]">
-              02. Travel Assist · Find Your Way
-            </p>
-            <h2 className="font-editorial text-4xl sm:text-5xl font-semibold text-white leading-[1.08] text-balance">
-              Reach every place with{' '}
+          <Reveal className="lg:col-span-5 space-y-5">
+            <p className="eyebrow-mono text-[#E9A34A]">02. SMART LOCAL HOP</p>
+            <h2 className="font-editorial text-3xl sm:text-5xl font-semibold text-white leading-[1.1] text-balance">
+              Every local journey, with more{' '}
               <span className="text-[#E9A34A] italic font-normal">confidence</span>.
             </h2>
-            <p className="text-base sm:text-[17px] text-[#F8F6F0]/80 leading-relaxed max-w-[60ch]">
-              Stepping out of an Indian railway junction, bus stand, or airport terminal should never begin with guesswork. Compare Bike, Auto, and Cab routes with live OSRM road distances across all 28 States &amp; 8 Union Territories.
+            <p className="text-base sm:text-[17px] text-[#F8F6F0]/80 leading-relaxed max-w-[58ch]">
+              Know what a fair local fare looks like, reach places before they close, and discover useful stops along your actual route — all in one intelligent travel companion.
             </p>
 
             <ul className="space-y-3 text-sm sm:text-[15px] text-[#F8F6F0]/85 pt-1">
-              <li className="flex items-start gap-3">
-                <Train className="w-5 h-5 text-[#E9A34A] shrink-0 mt-0.5" aria-hidden="true" />
-                <span>Category-strict search for railway stations, ISBTs, airports, temples &amp; hotels</span>
+              <li className="ys-card ys-card-dark rounded-xl p-2 -mx-2 flex items-start gap-3">
+                <span className="ys-icon-float shrink-0 mt-0.5">
+                  <Train className="w-5 h-5 text-[#E9A34A]" aria-hidden="true" />
+                </span>
+                <span>
+                  <strong className="text-white">Fair Fare &amp; Local Voice Pass</strong> — transparent regional fare estimates with ground tips and speakable driver scripts
+                </span>
               </li>
-              <li className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-[#8CC9E8] shrink-0 mt-0.5" aria-hidden="true" />
-                <span>Itemized fare comparison paired with nearby sightseeing &amp; cafe discovery</span>
+              <li className="ys-card ys-card-dark rounded-xl p-2 -mx-2 flex items-start gap-3">
+                <span className="ys-icon-float shrink-0 mt-0.5">
+                  <Clock className="w-5 h-5 text-[#8CC9E8]" aria-hidden="true" />
+                </span>
+                <span>
+                  <strong className="text-white">Timing &amp; Crowd Clock</strong> — real arrival margins against temple/monument closures and return trains
+                </span>
+              </li>
+              <li className="ys-card ys-card-dark rounded-xl p-2 -mx-2 flex items-start gap-3">
+                <span className="ys-icon-float shrink-0 mt-0.5">
+                  <MapPin className="w-5 h-5 text-[#E9A34A]" aria-hidden="true" />
+                </span>
+                <span>
+                  <strong className="text-white">Zero-Detour En-route Pitstops</strong> — ATMs, pure-veg meals, and pharmacies measured right on your route
+                </span>
               </li>
             </ul>
 
-            <div className="pt-3">
+            <div className="pt-2">
               <Link
                 to="/travel-assist"
-                className="group inline-flex items-center gap-2.5 px-7 py-3.5 min-h-[50px] rounded-full bg-[#E9A34A] text-[#142322] font-bold text-base hover:bg-[#DF9538] transition-colors shadow-lg whitespace-nowrap"
+                className="ys-btn-primary inline-flex items-center gap-2.5 px-7 py-3.5 min-h-[50px] rounded-full bg-[#E9A34A] text-[#142322] font-bold text-base hover:bg-[#DF9538] shadow-lg whitespace-nowrap"
               >
-                <span>Explore Travel Assist</span>
-                <ArrowRight
-                  className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1"
-                  aria-hidden="true"
-                />
+                <span>Open Smart Local Hop</span>
+                <ArrowRight className="ys-arrow w-4 h-4" aria-hidden="true" />
               </Link>
             </div>
           </Reveal>
 
-          {/* Right Layered Transit + Vehicle Cards Composition */}
-          <div className="lg:col-span-7 relative">
-            <div className="relative rounded-3xl overflow-hidden border border-white/15 aspect-[16/10] bg-[#161B1A] shadow-2xl">
-              <motion.div
-                style={{ scale: prefersReducedMotion ? 1 : mainPhotoScale }}
-                className="w-full h-full will-change-transform"
-              >
+          {/* Right Aligned Corridor Hero + 3 Smart Local Hop Showcase Cards */}
+          <div className="lg:col-span-7 space-y-4">
+            <Reveal delayMs={70}>
+              <div className="relative rounded-2xl overflow-hidden border border-white/15 aspect-[16/10] bg-[#161B1A] shadow-xl">
                 <SafeImage
                   src={IMAGES.indianRailwayArrival}
-                  alt="Grand Indian heritage railway station plaza at twilight with waiting auto-rickshaws and cabs"
+                  alt="Indian railway station plaza with waiting auto-rickshaws and cabs"
                   darkSkeleton
                   className="w-full h-full object-cover"
                 />
-              </motion.div>
-              <div
-                className="absolute inset-0 bg-gradient-to-t from-black/82 via-black/18 to-transparent"
-                aria-hidden="true"
-              />
-              <div className="absolute bottom-5 left-5 sm:bottom-6 sm:left-6">
-                <p className="text-sm font-medium text-[#8CC9E8]">All-India Arrival Intelligence</p>
-                <p className="font-editorial text-xl sm:text-2xl font-semibold text-white">
-                  Railway Stations · Airports · Bus Terminals
-                </p>
+                <div
+                  className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent"
+                  aria-hidden="true"
+                />
+                <div className="absolute bottom-5 left-5 right-5">
+                  <p className="text-sm font-medium text-[#8CC9E8]">Smart Local Hop · Pan-India Corridor Intelligence</p>
+                  <p className="font-editorial text-xl sm:text-2xl font-semibold text-white">
+                    Fair Fares · Timing Buffers · Zero-Detour Pitstops
+                  </p>
+                </div>
               </div>
-            </div>
+            </Reveal>
 
-            {/* Cascading Layered Vehicle Category Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-4 lg:-mt-12 lg:px-6 relative z-10">
-              {VEHICLE_SHOWCASE.map((veh, idx) => (
-                <motion.div
-                  key={veh.id}
-                  style={{ y: prefersReducedMotion ? 0 : cardOffsets[idx] }}
-                  className="will-change-transform"
-                >
-                  <motion.div
-                    whileHover={prefersReducedMotion ? undefined : { y: -8, scale: 1.03 }}
-                    transition={{ duration: 0.32, ease: EASE_PRIMARY }}
-                    className="group rounded-2xl bg-[#151A19] border border-white/15 hover:border-[#E9A34A]/50 overflow-hidden shadow-[0_18px_40px_rgba(0,0,0,0.65)] transition-colors"
-                  >
-                    <div className="aspect-[16/10] bg-white/95 overflow-hidden">
-                      <SafeImage
-                        src={veh.vehicleImg}
-                        alt={`${veh.label} — ${veh.note}`}
-                        className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.06]"
-                      />
-                    </div>
-                    <div className="p-3.5 sm:p-4">
-                      <p className="font-editorial text-base font-semibold text-white truncate">
-                        {veh.label}
-                      </p>
-                      <p className="text-sm text-[#F8F6F0]/75 truncate mt-0.5">
-                        {veh.note}
-                      </p>
-                    </div>
-                  </motion.div>
-                </motion.div>
+            <RevealGroup
+              staggerMs={STAGGER_CARDS_MS}
+              className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+            >
+              {SMART_HOP_SHOWCASE.map((card, idx) => (
+                <RevealItem key={card.id} index={idx}>
+                  <FlipCard
+                    isFlipped={flippedHopId === card.id}
+                    onFlipChange={(next) => setFlippedHopId(next ? card.id : null)}
+                    cardLabel={card.label}
+                    className="h-[246px]"
+                    front={
+                      <div className="h-full w-full rounded-2xl bg-[#151A19] border border-white/15 hover:border-[#E9A34A]/50 overflow-hidden shadow-md flex flex-col">
+                        <div className="h-[130px] bg-[#1D2523] overflow-hidden relative shrink-0">
+                          <SafeImage
+                            src={card.image}
+                            alt={`${card.label} — ${card.note}`}
+                            darkSkeleton
+                            className="ys-card-img w-full h-full object-cover"
+                          />
+                          <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-black/65 text-[11px] font-mono text-[#E9A34A]">
+                            {card.badge}
+                          </div>
+                        </div>
+                        <div className="p-3.5 flex-1 flex flex-col justify-center">
+                          <p className="font-editorial text-[15px] font-semibold text-white leading-snug">
+                            {card.label}
+                          </p>
+                          <p className="text-xs text-[#F8F6F0]/75 leading-snug mt-1">
+                            {card.note}
+                          </p>
+                        </div>
+                      </div>
+                    }
+                    back={
+                      <>
+                        <div className="space-y-2 pr-9">
+                          <p className="eyebrow-mono text-[#8CC9E8]">{card.badge}</p>
+                          <p className="font-editorial text-sm font-semibold text-white leading-snug">
+                            {card.label}
+                          </p>
+                          <p className="text-[11px] text-[#F8F6F0]/80 leading-relaxed line-clamp-2">
+                            {card.explanation}
+                          </p>
+                          <dl className="space-y-1 pt-0.5 text-[11px]">
+                            {card.metrics.map((m) => (
+                              <div key={m.label} className="flex items-center justify-between gap-2 border-b border-white/10 pb-0.5">
+                                <dt className="text-[#F8F6F0]/65">{m.label}</dt>
+                                <dd className="font-mono font-semibold text-[#E9A34A]">{m.value}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </div>
+
+                        <Link
+                          to="/travel-assist"
+                          onClick={(e) => e.stopPropagation()}
+                          className="ys-btn-primary w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-[36px] rounded-xl bg-[#E9A34A] text-[#142322] text-xs font-bold hover:bg-[#DF9538] shrink-0"
+                        >
+                          <span>Launch Travel Assist</span>
+                          <ArrowRight className="ys-arrow w-3.5 h-3.5" aria-hidden="true" />
+                        </Link>
+                      </>
+                    }
+                  />
+                </RevealItem>
               ))}
-            </div>
+            </RevealGroup>
           </div>
         </div>
       </div>
@@ -1074,15 +1044,15 @@ export function FindYourWaySection() {
 }
 
 /* --------------------------------------------------------------------------
- * SECTION 3 — BEYOND THE USUAL DESTINATIONS ("Find places worth remembering.")
- * Overlapping multi-category gallery with scroll-driven drift & switcher
+ * SECTION 3 — EXPLORE & PLAN ("Find places worth exploring.")
+ * Straight, aligned category gallery without rotations or overlap
  * -------------------------------------------------------------------------- */
 
 const BEYOND_CATEGORIES = [
   {
     id: 'temples',
     title: 'Temples & Heritage',
-    subtitle: 'Timings, entry realities, and ancient stone courtyards',
+    subtitle: 'Timings, entry details, and historic stone courtyards',
     cards: [
       {
         name: 'Shri Jagannath Temple',
@@ -1105,7 +1075,7 @@ const BEYOND_CATEGORIES = [
   {
     id: 'nature',
     title: 'Nature & Beaches',
-    subtitle: 'Quiet shores, village backwater ferries, and cedar valleys',
+    subtitle: 'Quiet shores, public backwater ferries, and cedar valleys',
     cards: [
       {
         name: 'Golden Coast Sunset',
@@ -1174,21 +1144,8 @@ const BEYOND_CATEGORIES = [
 ];
 
 export function BeyondUsualGallerySection() {
-  const prefersReducedMotion = Boolean(useReducedMotion());
   const { openDetail } = useDetailOverlay();
-  const ref = useRef<HTMLElement | null>(null);
   const [selectedCatIdx, setSelectedCatIdx] = useState(0);
-
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ['start end', 'end start'],
-  });
-
-  const smoothProgress = useSpring(scrollYProgress, SCROLL_SPRING);
-  const activeProgress = prefersReducedMotion ? scrollYProgress : smoothProgress;
-
-  const colAY = useTransform(activeProgress, [0, 1], [36, -36]);
-  const colBY = useTransform(activeProgress, [0, 1], [-24, 34]);
 
   const activeCategory = BEYOND_CATEGORIES[selectedCatIdx];
 
@@ -1201,7 +1158,6 @@ export function BeyondUsualGallerySection() {
       {
         kind: 'place',
         id: `beyond-${activeCategory.id}-${idx}`,
-        layoutId: `beyond-${activeCategory.id}-${idx}`,
         title: card.name,
         category: activeCategory.title,
         location: card.place,
@@ -1216,157 +1172,108 @@ export function BeyondUsualGallerySection() {
   };
 
   return (
-    <section
-      ref={ref}
-      className="relative py-24 sm:py-32 bg-gradient-to-b from-[#0A0D0C] via-[#0B0E0D] to-[#0E1312] text-[#F8F6F0] overflow-x-clip"
-    >
-      <div
-        className="absolute inset-0 pointer-events-none bg-editorial-grain opacity-65"
-        aria-hidden="true"
-      />
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-14">
+    <section className="relative py-20 sm:py-24 bg-[#0B0E0D] text-[#F8F6F0] overflow-x-clip border-t border-white/10">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         <Reveal className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
-          <div className="lg:col-span-7 space-y-4">
-            <p className="eyebrow-mono text-[#8CC9E8]">
-              03. Explore &amp; Plan
-            </p>
-            <h2 className="font-editorial text-4xl sm:text-5xl lg:text-[56px] font-semibold text-white leading-[1.06] text-balance">
+          <div className="lg:col-span-7 space-y-3">
+            <p className="eyebrow-mono text-[#8CC9E8]">03. Explore &amp; Plan</p>
+            <h2 className="font-editorial text-3xl sm:text-5xl font-semibold text-white leading-[1.1] text-balance">
               Find places worth{' '}
-              <span className="text-[#E9A34A] italic font-normal">remembering</span>.
+              <span className="text-[#E9A34A] italic font-normal">exploring</span>.
             </h2>
           </div>
 
-          <div className="lg:col-span-5 flex flex-col items-start lg:items-end justify-end gap-5">
-            <p className="text-base text-[#F8F6F0]/78 leading-relaxed lg:text-right max-w-md">
-              Discover landmarks alongside Cafe Corner solo-friendly perches and verified outdoor adventures—ordered into one multi-stop budget route.
+          <div className="lg:col-span-5 flex flex-col items-start lg:items-end justify-end gap-4">
+            <p className="text-base text-[#F8F6F0]/80 leading-relaxed lg:text-right max-w-md">
+              Discover heritage landmarks, solo-friendly cafes, and outdoor adventures — ordered into one multi-stop route.
             </p>
             <Link
               to="/explore"
-              className="group inline-flex items-center gap-2.5 px-7 py-3.5 min-h-[50px] rounded-full bg-white text-[#142322] font-bold text-base hover:bg-[#E9A34A] transition-colors whitespace-nowrap"
+              className="ys-btn-primary inline-flex items-center gap-2.5 px-7 py-3.5 min-h-[50px] rounded-full bg-white text-[#142322] font-bold text-base hover:bg-[#E9A34A] whitespace-nowrap"
             >
-              <span>Explore Destinations</span>
-              <ArrowRight
-                className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1"
-                aria-hidden="true"
-              />
+              <span>Open Explore &amp; Plan</span>
+              <ArrowRight className="ys-arrow w-4 h-4" aria-hidden="true" />
             </Link>
           </div>
         </Reveal>
 
-        {/* Interactive Category Switcher + Layered 2-Column Scroll-Shifting Collage */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Category Selector Rail */}
-          <div className="lg:col-span-5 space-y-2.5">
+          <RevealGroup staggerMs={STAGGER_CARDS_MS} className="lg:col-span-5 space-y-2.5">
             {BEYOND_CATEGORIES.map((cat, idx) => {
               const active = idx === selectedCatIdx;
               return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setSelectedCatIdx(idx)}
-                  onMouseEnter={() => setSelectedCatIdx(idx)}
-                  className={`w-full text-left p-5 rounded-2xl border transition-all duration-300 cursor-pointer ${
-                    active
-                      ? 'bg-[#121918] border-[#E9A34A]/65 shadow-lg'
-                      : 'bg-transparent border-white/10 hover:border-white/25 hover:bg-white/[0.03]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <h3
-                      className={`font-editorial text-2xl font-semibold transition-colors ${
-                        active ? 'text-[#E9A34A]' : 'text-white'
-                      }`}
-                    >
-                      {cat.title}
-                    </h3>
-                    <Compass
-                      className={`w-4 h-4 shrink-0 transition-transform duration-300 ${
-                        active ? 'text-[#E9A34A] rotate-45' : 'text-white/35'
-                      }`}
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <p className="text-sm sm:text-[15px] text-[#F8F6F0]/75 mt-1.5 leading-relaxed">
-                    {cat.subtitle}
-                  </p>
-                </button>
+                <RevealItem key={cat.id} index={idx}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCatIdx(idx)}
+                    onMouseEnter={() => setSelectedCatIdx(idx)}
+                    className={`ys-card ys-card-dark w-full text-left p-5 rounded-2xl border transition-colors duration-200 cursor-pointer ${
+                      active
+                        ? 'bg-[#121918] border-[#E9A34A]/65 shadow-md'
+                        : 'bg-transparent border-white/12 hover:border-white/25 hover:bg-white/[0.03]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <h3
+                        className={`font-editorial text-xl sm:text-2xl font-semibold transition-colors ${
+                          active ? 'text-[#E9A34A]' : 'text-white'
+                        }`}
+                      >
+                        {cat.title}
+                      </h3>
+                      <span className="ys-icon-float shrink-0">
+                        <Compass
+                          className={`w-4 h-4 transition-transform duration-300 ${
+                            active ? 'text-[#E9A34A] rotate-45' : 'text-white/35'
+                          }`}
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </div>
+                    <p className="text-sm sm:text-[15px] text-[#F8F6F0]/75 mt-1.5 leading-relaxed">
+                      {cat.subtitle}
+                    </p>
+                  </button>
+                </RevealItem>
               );
             })}
-          </div>
+          </RevealGroup>
 
-          {/* Overlapping Gallery Collage */}
-          <div className="lg:col-span-7 relative">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeCategory.id}
-                initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -12 }}
-                transition={{ duration: 0.4, ease: EASE_PRIMARY }}
-                className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center"
-              >
-                <motion.div
-                  style={{ y: prefersReducedMotion ? 0 : colAY }}
-                  className="will-change-transform"
+          {/* Straight, Aligned 2-Column Category Cards */}
+          <RevealGroup
+            retriggerKey={activeCategory.id}
+            immediate
+            direction="x"
+            durationMs={DUR_SLIDE_MS}
+            staggerMs={STAGGER_CARDS_MS}
+            className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-5 items-stretch"
+          >
+            {activeCategory.cards.map((card, idx) => (
+              <RevealItem key={`${activeCategory.id}-${card.name}`} index={idx}>
+                <button
+                  type="button"
+                  onClick={(e) => handleOpenGalleryCard(card, idx, e.currentTarget)}
+                  className="ys-card ys-card-dark group block w-full text-left relative aspect-[4/5] rounded-2xl overflow-hidden border border-white/18 hover:border-[#E9A34A]/65 shadow-xl bg-[#141817] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9A34A]"
                 >
-                  <motion.button
-                    type="button"
-                    onClick={(e) =>
-                      handleOpenGalleryCard(activeCategory.cards[0], 0, e.currentTarget)
-                    }
-                    className="group block w-full text-left relative aspect-[3/4] rounded-3xl overflow-hidden border border-white/20 shadow-[0_24px_60px_rgba(0,0,0,0.7)] sm:-rotate-2 hover:rotate-0 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer"
-                  >
-                    <SafeImage
-                      src={activeCategory.cards[0].image}
-                      alt={`${activeCategory.cards[0].name} — ${activeCategory.cards[0].place}`}
-                      darkSkeleton
-                      className="w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/20 to-transparent" />
-                    <div className="absolute bottom-5 left-5 right-5">
-                      <p className="text-sm font-medium text-[#E9A34A]">{activeCategory.title}</p>
-                      <p className="font-editorial text-2xl font-semibold text-white mt-0.5">
-                        {activeCategory.cards[0].name}
-                      </p>
-                      <p className="text-sm text-[#F8F6F0]/80 mt-0.5">
-                        {activeCategory.cards[0].place}
-                      </p>
-                    </div>
-                  </motion.button>
-                </motion.div>
-
-                <motion.div
-                  style={{ y: prefersReducedMotion ? 0 : colBY }}
-                  className="sm:mt-12 sm:-ml-6 relative z-10 will-change-transform"
-                >
-                  <motion.button
-                    type="button"
-                    onClick={(e) =>
-                      handleOpenGalleryCard(activeCategory.cards[1], 1, e.currentTarget)
-                    }
-                    className="group block w-full text-left relative aspect-[3/4] rounded-3xl overflow-hidden border border-[#E9A34A]/45 shadow-[0_28px_70px_rgba(0,0,0,0.85)] sm:rotate-2 hover:rotate-0 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer"
-                  >
-                    <SafeImage
-                      src={activeCategory.cards[1].image}
-                      alt={`${activeCategory.cards[1].name} — ${activeCategory.cards[1].place}`}
-                      darkSkeleton
-                      className="w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/20 to-transparent" />
-                    <div className="absolute bottom-5 left-5 right-5">
-                      <p className="text-sm font-medium text-[#8CC9E8]">{activeCategory.title}</p>
-                      <p className="font-editorial text-2xl font-semibold text-white mt-0.5">
-                        {activeCategory.cards[1].name}
-                      </p>
-                      <p className="text-sm text-[#F8F6F0]/80 mt-0.5">
-                        {activeCategory.cards[1].place}
-                      </p>
-                    </div>
-                  </motion.button>
-                </motion.div>
-              </motion.div>
-            </AnimatePresence>
-          </div>
+                  <SafeImage
+                    src={card.image}
+                    alt={`${card.name} — ${card.place}`}
+                    darkSkeleton
+                    className="ys-card-img w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
+                  <div className="absolute bottom-5 left-5 right-5 space-y-1">
+                    <p className="text-xs font-semibold text-[#8CC9E8]">{activeCategory.title}</p>
+                    <p className="font-editorial text-xl sm:text-2xl font-semibold text-white leading-snug">
+                      {card.name}
+                    </p>
+                    <p className="text-sm text-[#F8F6F0]/80">{card.place}</p>
+                  </div>
+                </button>
+              </RevealItem>
+            ))}
+          </RevealGroup>
         </div>
       </div>
     </section>
@@ -1374,112 +1281,90 @@ export function BeyondUsualGallerySection() {
 }
 
 /* --------------------------------------------------------------------------
- * SECTION 4 — STAY WITH CONFIDENCE ("Know your stay before you arrive.")
- * Opposing scroll-parallax Stay Reality diptych
+ * SECTION 4 — STAY REALITY ("Know your stay before you arrive.")
  * -------------------------------------------------------------------------- */
 
 export function StayConfidenceSection() {
-  const prefersReducedMotion = Boolean(useReducedMotion());
-  const ref = useRef<HTMLElement | null>(null);
-
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ['start end', 'end start'],
-  });
-
-  const smoothProgress = useSpring(scrollYProgress, SCROLL_SPRING);
-  const activeProgress = prefersReducedMotion ? scrollYProgress : smoothProgress;
-
-  const mainStayY = useTransform(activeProgress, [0, 1], [32, -32]);
-  const insetStayY = useTransform(activeProgress, [0, 1], [-24, 42]);
-
   return (
-    <section
-      ref={ref}
-      className="relative py-24 sm:py-32 bg-gradient-to-b from-[#0E1312] via-[#0F1514] to-[#090B0A] text-[#F8F6F0] overflow-x-clip"
-    >
-      <div
-        className="absolute inset-0 pointer-events-none bg-editorial-grain opacity-65"
-        aria-hidden="true"
-      />
+    <section className="relative py-20 sm:py-24 bg-[#0E1312] text-[#F8F6F0] overflow-x-clip border-t border-white/10">
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-          {/* Left Layered Stay Reality Composition */}
-          <div className="lg:col-span-7 relative pb-10 sm:pb-14">
-            <motion.div
-              style={{ y: prefersReducedMotion ? 0 : mainStayY }}
-              className="rounded-3xl overflow-hidden border border-white/15 aspect-[16/10] shadow-2xl will-change-transform"
-            >
-              <SafeImage
-                src={IMAGES.heritageHaveli}
-                alt="Sunlit Indian heritage courtyard guesthouse verified for lane access"
-                darkSkeleton
-                className="w-full h-full object-cover"
-              />
-            </motion.div>
-
-            <motion.div
-              style={{ y: prefersReducedMotion ? 0 : insetStayY }}
-              className="mt-4 sm:mt-0 sm:absolute sm:-bottom-2 sm:right-6 w-full sm:w-[54%] rounded-2xl overflow-hidden border border-[#E9A34A]/50 bg-[#121716] shadow-[0_24px_60px_rgba(0,0,0,0.85)] will-change-transform"
-            >
-              <div className="aspect-[16/10] overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+          {/* Left Clean Straight Stay Pair */}
+          <RevealGroup staggerMs={STAGGER_CARDS_MS} className="lg:col-span-7 space-y-4">
+            <RevealItem index={0}>
+              <div className="ys-card ys-card-dark rounded-2xl overflow-hidden border border-white/15 aspect-[16/10] shadow-xl bg-[#121716]">
                 <SafeImage
-                  src={IMAGES.homestayRoom}
-                  alt="Clean sunlit Indian homestay room checked for fiber Wi-Fi and ventilation"
+                  src={IMAGES.heritageHaveli}
+                  alt="Sunlit Indian heritage courtyard guesthouse checked for lane access"
                   darkSkeleton
-                  className="w-full h-full object-cover"
+                  className="ys-card-img w-full h-full object-cover"
                 />
               </div>
-              <div className="p-4 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm text-[#E9A34A] font-medium">Ground Audit Notes</p>
-                  <p className="font-editorial text-base font-semibold text-white">
-                    Parking · Fiber Wi-Fi · Cleanliness
-                  </p>
+            </RevealItem>
+
+            <RevealItem index={1}>
+              <div className="ys-card ys-card-dark grid grid-cols-1 sm:grid-cols-12 gap-4 items-center rounded-2xl overflow-hidden border border-white/15 bg-[#121716] p-4">
+                <div className="sm:col-span-5 aspect-[16/10] rounded-xl overflow-hidden bg-[#18201E]">
+                  <SafeImage
+                    src={IMAGES.homestayRoom}
+                    alt="Clean Indian homestay room checked for fiber Wi-Fi and ventilation"
+                    darkSkeleton
+                    className="ys-card-img w-full h-full object-cover"
+                  />
                 </div>
-                <ShieldCheck className="w-5 h-5 text-[#E9A34A] shrink-0" aria-hidden="true" />
+                <div className="sm:col-span-7 flex items-start justify-between gap-3 px-1">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-[#E9A34A] uppercase tracking-wider">
+                      Ground Audit Notes
+                    </p>
+                    <p className="font-editorial text-lg font-semibold text-white">
+                      Parking · Fiber Wi-Fi · Cleanliness
+                    </p>
+                    <p className="text-sm text-[#F8F6F0]/75 leading-relaxed">
+                      Check old-city cab walk distances, Airtel/Jio 5G reception, and extra utility fees upfront.
+                    </p>
+                  </div>
+                  <span className="ys-icon-float shrink-0 mt-1">
+                    <ShieldCheck className="w-5 h-5 text-[#E9A34A]" aria-hidden="true" />
+                  </span>
+                </div>
               </div>
-            </motion.div>
-          </div>
+            </RevealItem>
+          </RevealGroup>
 
           {/* Right Editorial Copy */}
-          <Reveal className="lg:col-span-5 space-y-6">
-            <p className="eyebrow-mono text-[#8CC9E8]">
-              04. Stay Reality
-            </p>
-            <h2 className="font-editorial text-4xl sm:text-5xl font-semibold text-white leading-[1.08] text-balance">
+          <Reveal className="lg:col-span-5 space-y-5">
+            <p className="eyebrow-mono text-[#8CC9E8]">04. Stay Reality</p>
+            <h2 className="font-editorial text-3xl sm:text-5xl font-semibold text-white leading-[1.1] text-balance">
               Know your stay before you{' '}
               <span className="text-[#E9A34A] italic font-normal">arrive</span>.
             </h2>
-            <p className="text-base sm:text-[17px] text-[#F8F6F0]/80 leading-relaxed max-w-[60ch]">
-              Booking thumbnails never tell you if four-wheelers are restricted inside old-city lanes, whether fiber Wi-Fi reaches your desk, or if winter room heaters cost extra. Inspect dated, practical facts upfront.
+            <p className="text-base sm:text-[17px] text-[#F8F6F0]/80 leading-relaxed max-w-[58ch]">
+              Booking thumbnails rarely show if four-wheelers are restricted inside narrow lanes, whether fiber Wi-Fi reaches your room, or if heaters cost extra. Inspect practical ground-level facts upfront.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-white/10 text-sm">
-              <div>
+            <RevealGroup staggerMs={STAGGER_CARDS_MS} className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-white/10 text-sm">
+              <RevealItem index={0}>
                 <p className="font-semibold text-white text-base">Lane &amp; Parking Reality</p>
                 <p className="text-sm text-[#F8F6F0]/72 mt-1 leading-relaxed">
                   Exact walk distances from cab drop-offs and gated parking slots.
                 </p>
-              </div>
-              <div>
-                <p className="font-semibold text-white text-base">Zero Fake Star Scores</p>
+              </RevealItem>
+              <RevealItem index={1}>
+                <p className="font-semibold text-white text-base">Practical Field Notes</p>
                 <p className="text-sm text-[#F8F6F0]/72 mt-1 leading-relaxed">
-                  Housekeeping standards, Airtel/Jio 5G reception &amp; hidden utility fees.
+                  Housekeeping standards, mobile reception &amp; upfront utility charges.
                 </p>
-              </div>
-            </div>
+              </RevealItem>
+            </RevealGroup>
 
             <div className="pt-2">
               <Link
                 to="/stay-reality"
-                className="group inline-flex items-center gap-2.5 px-7 py-3.5 min-h-[50px] rounded-full bg-[#E9A34A] text-[#142322] font-bold text-base hover:bg-[#DF9538] transition-colors shadow-lg whitespace-nowrap"
+                className="ys-btn-primary inline-flex items-center gap-2.5 px-7 py-3.5 min-h-[50px] rounded-full bg-[#E9A34A] text-[#142322] font-bold text-base hover:bg-[#DF9538] shadow-lg whitespace-nowrap"
               >
-                <span>Discover Stay Reality</span>
-                <ArrowRight
-                  className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1"
-                  aria-hidden="true"
-                />
+                <span>Open Stay Reality</span>
+                <ArrowRight className="ys-arrow w-4 h-4" aria-hidden="true" />
               </Link>
             </div>
           </Reveal>
@@ -1490,96 +1375,42 @@ export function StayConfidenceSection() {
 }
 
 /* --------------------------------------------------------------------------
- * SECTION 5 — FINAL CTA ("Your next journey starts here.")
- * Immersive highway mountain backdrop + drifting peripheral cards
+ * SECTION 5 — FINAL CTA
  * -------------------------------------------------------------------------- */
 
 export function FinalCtaSection({ ctaTo }: { ctaTo: string }) {
-  const prefersReducedMotion = Boolean(useReducedMotion());
-  const ref = useRef<HTMLElement | null>(null);
-
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ['start end', 'end end'],
-  });
-
-  const smoothProgress = useSpring(scrollYProgress, SCROLL_SPRING);
-  const activeProgress = prefersReducedMotion ? scrollYProgress : smoothProgress;
-
-  const bgScale = useTransform(activeProgress, [0, 1], [1.1, 1.0]);
-  const leftCardY = useTransform(activeProgress, [0, 1], [48, -16]);
-  const rightCardY = useTransform(activeProgress, [0, 1], [64, -24]);
-
   return (
-    <section
-      ref={ref}
-      className="relative min-h-[76vh] flex items-center justify-center overflow-hidden bg-[#090B0A] text-white py-24"
-    >
-      <motion.div
-        style={{ scale: prefersReducedMotion ? 1 : bgScale }}
-        className="absolute inset-0 will-change-transform"
-      >
+    <section className="relative min-h-[60vh] flex items-center justify-center overflow-hidden bg-[#090B0A] text-white py-20 border-t border-white/10">
+      <div className="absolute inset-0">
         <SafeImage
           src={IMAGES.spitiRoad}
           alt="High-altitude Himalayan mountain road winding toward sunlit peaks"
           darkSkeleton
-          className="w-full h-full object-cover opacity-50"
+          className="w-full h-full object-cover opacity-40"
         />
-      </motion.div>
+      </div>
 
       <div
-        className="absolute inset-0 bg-gradient-to-b from-[#090B0A]/90 via-[#0A0C0B]/60 to-[#070908]/95 pointer-events-none"
+        className="absolute inset-0 bg-gradient-to-b from-[#090B0A]/90 via-[#0A0C0B]/65 to-[#070908]/95 pointer-events-none"
         aria-hidden="true"
       />
 
-      {/* Peripheral Floating Vignette Cards on Desktop */}
-      <motion.div
-        style={{ y: prefersReducedMotion ? 0 : leftCardY }}
-        className="hidden lg:block absolute left-10 bottom-16 w-[180px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/20 -rotate-6 shadow-2xl opacity-80 pointer-events-none will-change-transform"
-        aria-hidden="true"
-      >
-        <SafeImage
-          src={IMAGES.jagannathTemple}
-          alt=""
-          darkSkeleton
-          className="w-full h-full object-cover"
-        />
-      </motion.div>
-
-      <motion.div
-        style={{ y: prefersReducedMotion ? 0 : rightCardY }}
-        className="hidden lg:block absolute right-10 top-16 w-[180px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/20 rotate-6 shadow-2xl opacity-80 pointer-events-none will-change-transform"
-        aria-hidden="true"
-      >
-        <SafeImage
-          src={IMAGES.indianBeach}
-          alt=""
-          darkSkeleton
-          className="w-full h-full object-cover"
-        />
-      </motion.div>
-
-      <Reveal className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-7">
-        <p className="eyebrow-mono text-[#8CC9E8]">
-          Yatra Saathi
-        </p>
-        <h2 className="font-editorial text-4xl sm:text-6xl lg:text-[68px] font-semibold text-white leading-[1.05] text-balance">
+      <Reveal className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+        <p className="eyebrow-mono text-[#8CC9E8]">Yatra Saathi</p>
+        <h2 className="font-editorial text-3xl sm:text-5xl lg:text-[60px] font-semibold text-white leading-[1.1] text-balance">
           Your next journey starts{' '}
           <span className="text-[#E9A34A] italic font-normal">here</span>.
         </h2>
-        <p className="text-base sm:text-xl text-[#F8F6F0]/82 max-w-xl mx-auto leading-relaxed">
-          Sign in or create your free account to compare arrival rides, sequence local stops, and save ground-checked stays offline.
+        <p className="text-base sm:text-xl text-[#F8F6F0]/82 max-w-2xl mx-auto leading-relaxed">
+          Use Travel Assist for smart local hops, Explore &amp; Plan to organize your stops, and Stay Reality to check practical room details before booking.
         </p>
         <div className="pt-2">
           <Link
             to={ctaTo}
-            className="group inline-flex items-center justify-center gap-2.5 px-9 py-4 min-h-[56px] rounded-full bg-[#E9A34A] text-[#142322] font-bold text-base sm:text-lg hover:bg-[#DF9538] active:scale-[0.98] transition-all shadow-[0_16px_45px_rgba(233,163,74,0.32)] whitespace-nowrap"
+            className="ys-btn-primary inline-flex items-center justify-center gap-2.5 px-9 py-4 min-h-[54px] rounded-full bg-[#E9A34A] text-[#142322] font-bold text-base sm:text-lg hover:bg-[#DF9538] shadow-[0_16px_45px_rgba(233,163,74,0.28)] whitespace-nowrap"
           >
             <span>Get Started</span>
-            <ArrowRight
-              className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1"
-              aria-hidden="true"
-            />
+            <ArrowRight className="ys-arrow w-5 h-5" aria-hidden="true" />
           </Link>
         </div>
       </Reveal>

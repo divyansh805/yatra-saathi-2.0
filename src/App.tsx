@@ -7,14 +7,16 @@ import { AuthPage } from './pages/AuthPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { TravelAssistPage } from './features/travel-assist/TravelAssistPage';
-import { CompareRidesPage } from './features/travel-assist/CompareRidesPage';
+import { FareVoicePassPage } from './features/travel-assist/FareVoicePassPage';
+import { TimingCrowdPage } from './features/travel-assist/TimingCrowdPage';
+import { PitstopsPage } from './features/travel-assist/PitstopsPage';
 import { ExplorePlanPage } from './features/explore-plan/ExplorePlanPage';
 import { DetailPage } from './features/explore-plan/DetailPage';
 import { StayRealityPage } from './features/stay-reality/StayRealityPage';
 import { StayDetailPage } from './features/stay-reality/StayDetailPage';
 import { SmoothScrollManager } from './components/SmoothScrollManager';
 import { DetailOverlayProvider } from './components/DetailOverlay';
-import { DURATION_BASE, EASE_PRIMARY } from './motion/tokens';
+import { DURATION_ROUTE, EASE_PRIMARY } from './motion/tokens';
 
 function QuotaBanner() {
   const { mapsQuotaExceeded } = useApp();
@@ -82,7 +84,7 @@ function AnimatedAppRoutes() {
       initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{
-        duration: prefersReducedMotion ? 0.14 : DURATION_BASE * 0.75,
+        duration: prefersReducedMotion ? 0.15 : DURATION_ROUTE,
         ease: EASE_PRIMARY,
       }}
     >
@@ -137,12 +139,32 @@ function AnimatedAppRoutes() {
           }
         />
         <Route
-          path="/travel-assist/compare"
+          path="/travel-assist/fare"
           element={
             <ProtectedRoute>
-              <CompareRidesPage />
+              <FareVoicePassPage />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/travel-assist/timing"
+          element={
+            <ProtectedRoute>
+              <TimingCrowdPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/travel-assist/pitstops"
+          element={
+            <ProtectedRoute>
+              <PitstopsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/travel-assist/compare"
+          element={<Navigate to="/travel-assist" replace />}
         />
         <Route
           path="/explore"

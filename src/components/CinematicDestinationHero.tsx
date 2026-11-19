@@ -112,16 +112,16 @@ function ActionButton({
   isPrimary?: boolean;
 }) {
   const baseClass = isPrimary
-    ? 'inline-flex items-center justify-center gap-2 px-6 py-3 min-h-[46px] rounded-full bg-[#E9A34A] text-[#142322] text-sm sm:text-[15px] font-bold hover:bg-[#DF9538] active:scale-[0.985] transition-all shadow-md whitespace-nowrap shrink-0 cursor-pointer'
+    ? 'ys-btn-primary inline-flex items-center justify-center gap-2 px-6 py-3 min-h-[46px] rounded-full bg-[#E9A34A] text-[#142322] text-sm sm:text-[15px] font-bold hover:bg-[#DF9538] shadow-md whitespace-nowrap shrink-0 cursor-pointer'
     : action.variant === 'ghost'
-    ? 'inline-flex items-center justify-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full border border-white/25 bg-white/10 backdrop-blur-xs text-white text-sm font-semibold hover:bg-white/20 transition-colors whitespace-nowrap shrink-0 cursor-pointer'
-    : 'inline-flex items-center justify-center gap-1.5 px-5 py-2.5 min-h-[44px] rounded-full border border-white/35 bg-[#0D2B29]/60 backdrop-blur-sm text-white text-sm font-semibold hover:bg-[#123D3A] transition-colors whitespace-nowrap shrink-0 cursor-pointer';
+    ? 'ys-chip inline-flex items-center justify-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full border border-white/25 bg-white/10 backdrop-blur-xs text-white text-sm font-semibold hover:bg-white/20 whitespace-nowrap shrink-0 cursor-pointer'
+    : 'ys-btn-secondary inline-flex items-center justify-center gap-1.5 px-5 py-2.5 min-h-[44px] rounded-full border border-white/35 bg-[#0D2B29]/60 backdrop-blur-sm text-white text-sm font-semibold hover:bg-[#123D3A] whitespace-nowrap shrink-0 cursor-pointer';
 
   const content = (
     <>
       {action.icon}
       <span>{action.label}</span>
-      {isPrimary && !action.icon && <ArrowRight className="w-4 h-4" aria-hidden="true" />}
+      {isPrimary && !action.icon && <ArrowRight className="ys-arrow w-4 h-4" aria-hidden="true" />}
     </>
   );
 
@@ -294,35 +294,33 @@ export function CinematicDestinationHero({
                 )}
               </div>
 
-              {/* Staggered Editorial Heading */}
-              <div className="overflow-hidden">
-                <motion.h1
-                  initial={
-                    prefersReducedMotion
-                      ? { opacity: 1 }
-                      : { opacity: 0, y: 24 }
-                  }
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    duration: prefersReducedMotion ? 0.12 : 0.55,
-                    delay: prefersReducedMotion ? 0 : 0.06,
-                    ease: EASE_CINEMA,
-                  }}
-                  className="font-editorial text-[34px] sm:text-[46px] lg:text-[56px] font-bold text-white leading-[1.06] tracking-tight text-balance"
-                >
-                  {renderTitleWithAccent(showcase.title, showcase.accentWord)}
-                </motion.h1>
-              </div>
+              {/* Editorial Heading */}
+              <motion.h1
+                initial={
+                  prefersReducedMotion
+                    ? { opacity: 1 }
+                    : { opacity: 0, y: 12 }
+                }
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: prefersReducedMotion ? 0.12 : 0.4,
+                  delay: prefersReducedMotion ? 0 : 0.04,
+                  ease: EASE_CINEMA,
+                }}
+                className="font-editorial text-[32px] sm:text-[44px] lg:text-[54px] font-bold text-white leading-[1.12] tracking-tight text-balance py-0.5"
+              >
+                {renderTitleWithAccent(showcase.title, showcase.accentWord)}
+              </motion.h1>
 
               {/* Short Destination Description */}
               <motion.p
                 initial={
-                  prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 12 }
+                  prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 10 }
                 }
                 animate={{ opacity: 1, y: 0 }}
                 transition={{
-                  duration: prefersReducedMotion ? 0.12 : 0.48,
-                  delay: prefersReducedMotion ? 0 : 0.14,
+                  duration: prefersReducedMotion ? 0.12 : 0.38,
+                  delay: prefersReducedMotion ? 0 : 0.08,
                   ease: EASE_CINEMA,
                 }}
                 className="text-base sm:text-[17px] text-[#F8F6F0]/90 leading-relaxed max-w-xl"
@@ -338,18 +336,18 @@ export function CinematicDestinationHero({
                   }
                   animate={{ opacity: 1, y: 0 }}
                   transition={{
-                    duration: prefersReducedMotion ? 0.12 : 0.45,
-                    delay: prefersReducedMotion ? 0 : 0.2,
+                    duration: prefersReducedMotion ? 0.12 : 0.38,
+                    delay: prefersReducedMotion ? 0 : 0.12,
                     ease: EASE_CINEMA,
                   }}
-                  className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-2.5 pt-3 border-t border-white/15 max-w-xl"
+                  className="grid grid-cols-1 sm:grid-cols-3 gap-x-5 gap-y-2.5 pt-3 border-t border-white/15 max-w-xl"
                 >
                   {showcase.facts.map((fact) => (
                     <div key={`${fact.label}-${fact.value}`} className="min-w-0">
-                      <dt className="eyebrow-mono text-[#8CC9E8]/90 truncate">
+                      <dt className="eyebrow-mono text-[#8CC9E8]/90 leading-snug">
                         {fact.label}
                       </dt>
-                      <dd className="text-sm font-semibold text-white truncate mt-0.5 tabular-figures">
+                      <dd className="text-sm font-semibold text-white leading-snug mt-0.5 tabular-figures">
                         {fact.value}
                       </dd>
                     </div>
@@ -366,8 +364,8 @@ export function CinematicDestinationHero({
                   }
                   animate={{ opacity: 1, y: 0 }}
                   transition={{
-                    duration: prefersReducedMotion ? 0.12 : 0.45,
-                    delay: prefersReducedMotion ? 0 : 0.25,
+                    duration: prefersReducedMotion ? 0.12 : 0.38,
+                    delay: prefersReducedMotion ? 0 : 0.16,
                     ease: EASE_CINEMA,
                   }}
                   className="flex flex-wrap items-center gap-3 pt-2"

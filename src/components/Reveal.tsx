@@ -1,142 +1,175 @@
-import type { ReactNode } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
 import {
-  DURATION_SLOW,
-  EASE_PRIMARY,
-  STAGGER_STEP,
-  VIEWPORT_DEFAULT,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
+import {
+  computeStaggerDelayMs,
+  DUR_BASE_MS,
+  DUR_SLIDE_MS,
+  MAX_STAGGER_ANIMATED_ITEMS,
+  STAGGER_CARDS_MS,
 } from '../motion/tokens';
+import { useOnceInView, usePrefersReducedMotion } from '../motion/useMotion';
+
+interface RevealContextValue {
+  hasEntered: boolean;
+  reducedMotion: boolean;
+  staggerMs: number;
+  maxAnimatedItems: number;
+  direction: 'y' | 'x';
+  durationMs: number;
+}
+
+const RevealContext = createContext<RevealContextValue | null>(null);
 
 interface RevealProps {
   children: ReactNode;
   className?: string;
+  /** Delay in seconds (kept compatible with existing callers) or use delayMs */
   delay?: number;
-  y?: number;
+  delayMs?: number;
+  direction?: 'y' | 'x';
+  durationMs?: number;
   immediate?: boolean;
+  retriggerKey?: string | number;
 }
 
 export function Reveal({
   children,
   className = '',
   delay = 0,
-  y = 24,
+  delayMs,
+  direction = 'y',
+  durationMs,
   immediate = false,
+  retriggerKey,
 }: RevealProps) {
-  const prefersReducedMotion = Boolean(useReducedMotion());
+  const { ref, hasEntered, reducedMotion } = useOnceInView<HTMLDivElement>({
+    immediate,
+    retriggerKey,
+  });
+  const [settled, setSettled] = useState(false);
 
-  const initial = prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y };
-  const target = prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 };
+  useEffect(() => {
+    setSettled(false);
+  }, [retriggerKey]);
 
-  if (immediate) {
-    return (
-      <motion.div
-        initial={initial}
-        animate={target}
-        transition={{
-          duration: prefersReducedMotion ? 0.2 : DURATION_SLOW,
-          delay,
-          ease: EASE_PRIMARY,
-        }}
-        className={className}
-      >
-        {children}
-      </motion.div>
-    );
-  }
+  const effectiveDelayMs = delayMs ?? Math.round(delay * 1000);
+  const effectiveDurMs =
+    durationMs ?? (direction === 'x' ? DUR_SLIDE_MS : DUR_BASE_MS);
 
   return (
-    <motion.div
-      initial={initial}
-      whileInView={target}
-      viewport={VIEWPORT_DEFAULT}
-      transition={{
-        duration: prefersReducedMotion ? 0.2 : DURATION_SLOW,
-        delay,
-        ease: EASE_PRIMARY,
+    <div
+      ref={ref}
+      data-visible={hasEntered ? 'true' : 'false'}
+      onTransitionEnd={() => setSettled(true)}
+      style={{
+        transitionDelay: hasEntered && !reducedMotion ? `${effectiveDelayMs}ms` : '0ms',
+        transitionDuration: reducedMotion ? '150ms' : `${effectiveDurMs}ms`,
+        willChange: !settled && !reducedMotion ? 'transform, opacity' : 'auto',
       }}
-      className={className}
+      className={`${direction === 'x' ? 'ys-reveal-x' : 'ys-reveal-y'} ${className}`}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 
 export function RevealGroup({
   children,
   className = '',
-  stagger = STAGGER_STEP,
+  stagger,
+  staggerMs,
+  maxAnimatedItems = MAX_STAGGER_ANIMATED_ITEMS,
+  direction = 'y',
+  durationMs,
   immediate = false,
+  retriggerKey,
 }: {
   children: ReactNode;
   className?: string;
+  /** Stagger step in seconds (legacy compat) */
   stagger?: number;
+  /** Stagger step in milliseconds */
+  staggerMs?: number;
+  maxAnimatedItems?: number;
+  direction?: 'y' | 'x';
+  durationMs?: number;
   immediate?: boolean;
+  retriggerKey?: string | number;
 }) {
-  const prefersReducedMotion = Boolean(useReducedMotion());
+  const { ref, hasEntered, reducedMotion } = useOnceInView<HTMLDivElement>({
+    immediate,
+    retriggerKey,
+  });
 
-  const variants = {
-    hidden: {},
-    visible: {
-      transition: {
-        staggerChildren: prefersReducedMotion ? 0 : stagger,
-      },
-    },
-  };
-
-  if (immediate) {
-    return (
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={variants}
-        className={className}
-      >
-        {children}
-      </motion.div>
-    );
-  }
+  const resolvedStaggerMs =
+    staggerMs ?? (typeof stagger === 'number' ? Math.round(stagger * 1000) : STAGGER_CARDS_MS);
+  const resolvedDurationMs =
+    durationMs ?? (direction === 'x' ? DUR_SLIDE_MS : DUR_BASE_MS);
 
   return (
-    <motion.div
-      initial="hidden"
-      whileInView="visible"
-      viewport={VIEWPORT_DEFAULT}
-      variants={variants}
-      className={className}
+    <RevealContext.Provider
+      value={{
+        hasEntered,
+        reducedMotion,
+        staggerMs: resolvedStaggerMs,
+        maxAnimatedItems,
+        direction,
+        durationMs: resolvedDurationMs,
+      }}
     >
-      {children}
-    </motion.div>
+      <div ref={ref} className={className}>
+        {children}
+      </div>
+    </RevealContext.Provider>
   );
 }
 
 export function RevealItem({
   children,
   className = '',
-  y = 24,
+  index = 0,
+  direction,
 }: {
   children: ReactNode;
   className?: string;
-  y?: number;
+  index?: number;
+  direction?: 'y' | 'x';
 }) {
-  const prefersReducedMotion = Boolean(useReducedMotion());
+  const ctx = useContext(RevealContext);
+  const [settled, setSettled] = useState(false);
+
+  const hasEntered = ctx ? ctx.hasEntered : true;
+  const reducedMotion = ctx ? ctx.reducedMotion : false;
+  const staggerMs = ctx ? ctx.staggerMs : STAGGER_CARDS_MS;
+  const maxAnimatedItems = ctx ? ctx.maxAnimatedItems : MAX_STAGGER_ANIMATED_ITEMS;
+  const resolvedDirection = direction ?? ctx?.direction ?? 'y';
+  const durationMs = ctx?.durationMs ?? (resolvedDirection === 'x' ? DUR_SLIDE_MS : DUR_BASE_MS);
+
+  const computedDelay = computeStaggerDelayMs(index, staggerMs, maxAnimatedItems);
+
+  // Items beyond maxAnimatedItems appear immediately without stagger delay
+  if (computedDelay === null) {
+    return <div className={`ys-reveal-instant ${className}`}>{children}</div>;
+  }
 
   return (
-    <motion.div
-      variants={{
-        hidden: prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y },
-        visible: {
-          opacity: 1,
-          y: 0,
-          transition: {
-            duration: prefersReducedMotion ? 0.2 : DURATION_SLOW,
-            ease: EASE_PRIMARY,
-          },
-        },
+    <div
+      data-visible={hasEntered ? 'true' : 'false'}
+      onTransitionEnd={() => setSettled(true)}
+      style={{
+        transitionDelay: hasEntered && !reducedMotion ? `${computedDelay}ms` : '0ms',
+        transitionDuration: reducedMotion ? '150ms' : `${durationMs}ms`,
+        willChange: !settled && !reducedMotion ? 'transform, opacity' : 'auto',
       }}
-      className={className}
+      className={`${resolvedDirection === 'x' ? 'ys-reveal-x' : 'ys-reveal-y'} ${className}`}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 
@@ -144,39 +177,77 @@ export function MaskedHeadlineWords({
   text,
   accentWord,
   className = '',
-  baseDelay = 0.08,
+  baseDelayMs = 70,
+  wordStepMs = 55,
+  immediate = true,
 }: {
   text: string;
   accentWord?: string;
   className?: string;
-  baseDelay?: number;
+  baseDelayMs?: number;
+  wordStepMs?: number;
+  immediate?: boolean;
 }) {
-  const prefersReducedMotion = Boolean(useReducedMotion());
-  const words = text.split(' ');
+  const reducedMotion = usePrefersReducedMotion();
+  const { ref, hasEntered } = useOnceInView<HTMLSpanElement>({ immediate });
+  const words = text.trim().split(/\s+/);
+
+  // Use clean block reveal if >= 8 words or reduced motion
+  if (words.length >= 8 || reducedMotion) {
+    return (
+      <span
+        ref={ref}
+        data-visible={hasEntered ? 'true' : 'false'}
+        className={`ys-reveal-y inline ${className}`}
+      >
+        {words.map((word, idx) => {
+          const cleanWord = word.replace(/[.,!?—–]/g, '');
+          const isAccent =
+            accentWord && cleanWord.toLowerCase() === accentWord.toLowerCase();
+          return (
+            <span key={`${word}-${idx}`}>
+              <span className={isAccent ? 'text-[#E9A34A] italic font-normal' : undefined}>
+                {word}
+              </span>
+              {idx < words.length - 1 ? ' ' : ''}
+            </span>
+          );
+        })}
+      </span>
+    );
+  }
 
   return (
-    <span className={className}>
-      {words.map((word, idx) => {
-        const cleanWord = word.replace(/[.,!?]/g, '');
-        const isAccent =
-          accentWord && cleanWord.toLowerCase() === accentWord.toLowerCase();
-        return (
-          <span key={`${word}-${idx}`} className="inline-block overflow-hidden align-bottom mr-[0.26em] last:mr-0">
-            <motion.span
-              className={`inline-block ${isAccent ? 'text-[#E9A34A] italic font-normal' : ''}`}
-              initial={prefersReducedMotion ? { opacity: 0 } : { y: '108%', opacity: 0 }}
-              animate={prefersReducedMotion ? { opacity: 1 } : { y: '0%', opacity: 1 }}
-              transition={{
-                duration: prefersReducedMotion ? 0.2 : 0.65,
-                delay: prefersReducedMotion ? 0 : baseDelay + idx * 0.055,
-                ease: EASE_PRIMARY,
-              }}
-            >
-              {word}
-            </motion.span>
-          </span>
-        );
-      })}
+    <span ref={ref} className={`inline ${className}`}>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">
+        {words.map((word, idx) => {
+          const cleanWord = word.replace(/[.,!?—–]/g, '');
+          const isAccent =
+            accentWord && cleanWord.toLowerCase() === accentWord.toLowerCase();
+          const delayMs = baseDelayMs + idx * wordStepMs;
+          return (
+            <span key={`${word}-${idx}`}>
+              <span
+                className="ys-word-mask"
+                data-visible={hasEntered ? 'true' : 'false'}
+              >
+                <span
+                  className={`ys-word-inner ${
+                    isAccent ? 'text-[#E9A34A] italic font-normal' : ''
+                  }`}
+                  style={{
+                    transitionDelay: hasEntered ? `${delayMs}ms` : '0ms',
+                  }}
+                >
+                  {word}
+                </span>
+              </span>
+              {idx < words.length - 1 ? ' ' : ''}
+            </span>
+          );
+        })}
+      </span>
     </span>
   );
 }

@@ -7,14 +7,24 @@ import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import {
   INDIA_STATES_AND_UTS,
+  INDIAN_CURATED_LANDMARKS,
   INDIAN_TRANSIT_HUBS,
   evaluateCityCoverage,
-} from './src/data/indiaLocations';
+  findCuratedGroundTips,
+} from './src/data/indiaLocations.ts';
 import {
   computeProviderFare,
+  computeSmartLocalHopFares,
   type FareBreakdown,
   type FareEstimateType,
-} from './src/data/fareEngine';
+} from './src/data/fareEngine.ts';
+import type {
+  EnroutePitstop,
+  PitstopCategory,
+  SmartHopLocalVoiceResponse,
+  SmartHopTimingResponse,
+  TimingStatus,
+} from './src/features/travel-assist/smartHopTypes.ts';
 
 dotenv.config();
 
@@ -396,6 +406,154 @@ async function computeRoadDistance(
     isLiveRoute: false,
     error: 'OSRM road routing is currently unavailable for these coordinates. Distance, duration, and fares are withheld rather than invented.',
   };
+}
+
+interface SmartHopRouteOutput extends RoadRouteResult {
+  trafficAwareDurationMin: number | null;
+  isTrafficAware: boolean;
+  trafficSourceLabel: string;
+}
+
+const smartHopRouteCache = new Map<string, { expiresAt: number; payload: SmartHopRouteOutput }>();
+const detourRouteCache = new Map<string, { expiresAt: number; distanceKm: number; durationMin: number }>();
+const placeHoursCache = new Map<string, { expiresAt: number; text: string; openNow: boolean | null }>();
+
+async function computeSmartHopRoute(
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number }
+): Promise<SmartHopRouteOutput> {
+  const cacheKey = `${origin.lat.toFixed(4)},${origin.lng.toFixed(4)}->${destination.lat.toFixed(4)},${destination.lng.toFixed(4)}`;
+  const cached = smartHopRouteCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.payload;
+  }
+
+  const base = await computeRoadDistance(origin, destination);
+  let trafficAwareDurationMin: number | null = null;
+  let isTrafficAware = false;
+  let trafficSourceLabel = 'Standard road estimate (no live traffic feed)';
+
+  const gmpKey = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
+  if (base.routeAvailable && base.source === 'Google Maps Routes API' && base.durationMin !== null) {
+    trafficAwareDurationMin = base.durationMin;
+    isTrafficAware = true;
+    trafficSourceLabel = 'Google Routes Live Traffic';
+  } else if (base.routeAvailable && gmpKey) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3200);
+      const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': gmpKey,
+          'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
+        },
+        body: JSON.stringify({
+          origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
+          destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
+          travelMode: 'DRIVE',
+          routingPreference: 'TRAFFIC_AWARE',
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (response.ok) {
+        const data = (await response.json()) as {
+          routes?: Array<{ distanceMeters?: number; duration?: string }>;
+        };
+        const first = data.routes?.[0];
+        if (first?.duration) {
+          const sec = Number(first.duration.replace('s', ''));
+          if (Number.isFinite(sec) && sec > 0) {
+            trafficAwareDurationMin = Math.max(2, Math.round(sec / 60));
+            isTrafficAware = true;
+            trafficSourceLabel = 'Google Routes Live Traffic';
+          }
+        }
+      }
+    } catch {
+      // Keep honest OSRM non-traffic estimate without inventing traffic adjustment
+    }
+  }
+
+  const out: SmartHopRouteOutput = {
+    ...base,
+    trafficAwareDurationMin,
+    isTrafficAware,
+    trafficSourceLabel,
+  };
+  if (out.routeAvailable) {
+    smartHopRouteCache.set(cacheKey, { expiresAt: Date.now() + 3 * 60 * 1000, payload: out });
+  }
+  return out;
+}
+
+async function computeViaStopRoadRoute(
+  origin: { lat: number; lng: number },
+  stop: { lat: number; lng: number },
+  destination: { lat: number; lng: number }
+): Promise<{ distanceKm: number; durationMin: number } | null> {
+  const key = `${origin.lat.toFixed(4)},${origin.lng.toFixed(4)}|${stop.lat.toFixed(4)},${stop.lng.toFixed(4)}|${destination.lat.toFixed(4)},${destination.lng.toFixed(4)}`;
+  const cached = detourRouteCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { distanceKm: cached.distanceKm, durationMin: cached.durationMin };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3200);
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${stop.lng},${stop.lat};${destination.lng},${destination.lat}?overview=false`;
+    const r = await fetch(osrmUrl, {
+      headers: { 'User-Agent': 'YatraSaathiTravelIntelligence/1.0' },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (r.ok) {
+      const json = (await r.json()) as {
+        code?: string;
+        routes?: Array<{ distance?: number; duration?: number }>;
+      };
+      const first = json.routes?.[0];
+      if (json.code === 'Ok' && typeof first?.distance === 'number' && typeof first?.duration === 'number') {
+        const resVal = {
+          distanceKm: Number(Math.max(0.1, first.distance / 1000).toFixed(2)),
+          durationMin: Math.max(2, Math.round(first.duration / 60)),
+        };
+        detourRouteCache.set(key, { expiresAt: Date.now() + 10 * 60 * 1000, ...resVal });
+        return resVal;
+      }
+    }
+  } catch {
+    // Fall through cleanly
+  }
+  return null;
+}
+
+function projectPointOntoPolyline(
+  point: { lat: number; lng: number },
+  polyline: Array<{ lat: number; lng: number }>
+): { minDistanceKm: number; progressPercent: number } {
+  if (!polyline || polyline.length === 0) {
+    return { minDistanceKm: 999, progressPercent: 0 };
+  }
+  if (polyline.length === 1) {
+    return {
+      minDistanceKm: haversineKm(point.lat, point.lng, polyline[0].lat, polyline[0].lng),
+      progressPercent: 50,
+    };
+  }
+  let bestDist = Infinity;
+  let bestIdx = 0;
+  for (let i = 0; i < polyline.length; i++) {
+    const d = haversineKm(point.lat, point.lng, polyline[i].lat, polyline[i].lng);
+    if (d < bestDist) {
+      bestDist = d;
+      bestIdx = i;
+    }
+  }
+  const progressPercent = Math.round((bestIdx / Math.max(1, polyline.length - 1)) * 100);
+  return { minDistanceKm: Number(bestDist.toFixed(2)), progressPercent };
 }
 
 async function startServer() {
@@ -1056,9 +1214,15 @@ async function startServer() {
   // Detect known Indian city from query text or coordinate bias
   const resolveKnownCity = (queryText: string, biasLat?: number, biasLng?: number): string => {
     const qNorm = queryText.toLowerCase().trim();
-    const sortedCities = [...new Set(INDIAN_TRANSIT_HUBS.map((h) => h.city))].sort(
-      (a, b) => b.length - a.length
-    );
+    if (/\b(vaishno\s*devi|banganga|ardhkuwari|adhkuwari|sanjichhat|bhairon|tarakote|katra)\b/i.test(qNorm)) {
+      return 'Katra';
+    }
+    const sortedCities = [
+      ...new Set([
+        ...INDIAN_TRANSIT_HUBS.map((h) => h.city),
+        ...INDIAN_CURATED_LANDMARKS.map((l) => l.city),
+      ]),
+    ].sort((a, b) => b.length - a.length);
     for (const c of sortedCities) {
       const escaped = c.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       if (new RegExp(`\\b${escaped}\\b`, 'i').test(qNorm)) {
@@ -1108,12 +1272,15 @@ async function startServer() {
     const qLower = query.toLowerCase();
     const stateLower = stateFilter.toLowerCase();
     const isTransitKind = kind === 'station' || kind === 'bus' || kind === 'airport';
-    const isArrivalAll = kind === 'all';
-    const isLandmarkKind = kind === 'landmark';
+    const isArrivalAll = kind === 'all' || kind === 'current';
+    const isTempleKind = kind === 'temple';
+    const isBeachKind = kind === 'beach';
+    const isMarketKind = kind === 'market';
+    const isLandmarkKind =
+      kind === 'landmark' || kind === 'attraction' || isTempleKind || isBeachKind;
     const isHotelKind = kind === 'hotel';
 
-    // 1. Indian Transit Index — ONLY included when searching transit hubs (station / bus / airport) or Arrival "Other Location" (all).
-    // NEVER included for Temple / Landmark, Hotel / Stay, or Custom Address!
+    // 1. Indian Transit Index — included for transit hub categories or general 'all'
     const hubMatches: SuggestResult[] =
       isTransitKind || isArrivalAll
         ? INDIAN_TRANSIT_HUBS.filter((hub) => {
@@ -1145,13 +1312,67 @@ async function startServer() {
             lat: hub.lat,
             lng: hub.lng,
             groundTip: hub.groundTip,
+            openingHours: undefined,
             source: 'Indian Transit Index',
+          }))
+        : [];
+
+    const isAddressKind = kind === 'address' || isMarketKind;
+
+    // Curated landmark matches for landmark, temple, beach, attraction, address, or general ('all') searches
+    const curatedMatches: SuggestResult[] =
+      isLandmarkKind || isAddressKind || isArrivalAll
+        ? INDIAN_CURATED_LANDMARKS.filter((lm) => {
+            if (isTempleKind && lm.discoverCategory !== 'Temples & Heritage' && !/temple|shrine|mandir|deodi|cave|ghat/i.test(`${lm.name} ${lm.placeType}`)) {
+              return false;
+            }
+            if (isBeachKind && !/beach|seafront|lake|coastal/i.test(`${lm.name} ${lm.placeType}`)) {
+              return false;
+            }
+            if (stateLower && lm.state.toLowerCase() !== stateLower) {
+              if (!qLower || qLower.length < 3) return false;
+            }
+            if (!qLower || qLower.length < 2) {
+              if (Number.isFinite(biasLat) && Number.isFinite(biasLng)) {
+                return haversineKm(biasLat, biasLng, lm.lat, lm.lng) <= 55;
+              }
+              return Boolean(stateLower && lm.state.toLowerCase() === stateLower);
+            }
+            const searchHay = [
+              lm.name,
+              ...(lm.aliases || []),
+              lm.city,
+              lm.state,
+              lm.placeType,
+            ]
+              .join(' ')
+              .toLowerCase();
+            return (
+              searchHay.includes(qLower) ||
+              qLower
+                .split(/\s+/)
+                .filter((tok) => tok.length >= 3)
+                .every((tok) => searchHay.includes(tok))
+            );
+          }).map((lm) => ({
+            id: lm.id,
+            label: lm.name,
+            subtitle: `${lm.placeType} · ${lm.city}, ${lm.state}`,
+            city: lm.city,
+            state: lm.state,
+            placeType: lm.placeType,
+            lat: lm.lat,
+            lng: lm.lng,
+            groundTip: lm.groundTip,
+            openingHours: lm.openingHoursText,
+            source: 'Regional Landmark Directory',
           }))
         : [];
 
     // Early return on focus (< 2 chars) for station/bus/airport/all
     if (query.length < 2 && (isTransitKind || isArrivalAll)) {
-      res.json({ suggestions: hubMatches.slice(0, 8) });
+      const focusCombined = [...hubMatches, ...curatedMatches].slice(0, 8);
+      res.json({ suggestions: focusCombined });
       return;
     }
 
@@ -1195,7 +1416,7 @@ async function startServer() {
           }
         }
 
-        const landmarkCandidates: SuggestResult[] = [];
+        const landmarkCandidates: SuggestResult[] = [...curatedMatches];
         const tasks: Array<Promise<void>> = [];
 
         // A. Optional Google Places Nearby Search
@@ -1484,11 +1705,15 @@ async function startServer() {
       if (kind === 'airport') {
         return /\b(airport|aerodrome|aviation|airfield|terminal)\b/i.test(text);
       }
-      if (kind === 'landmark') {
+      if (kind === 'landmark' || kind === 'attraction' || kind === 'temple' || kind === 'beach') {
         const labelLower = item.label.toLowerCase().trim();
-        if (labelLower === stateLower || labelLower === qLower && Boolean(matchedCityInQuery)) return false;
+        if (labelLower === stateLower || (labelLower === qLower && Boolean(matchedCityInQuery))) return false;
         if (labelLower.includes('(city)')) return false;
         return isGenuineVisitorLandmark(item.label, item.subtitle, item.placeType);
+      }
+      if (kind === 'market') {
+        if (/\b(airport|railway station)\b/i.test(text) && !/\bmarket|bazaar\b/i.test(qLower)) return false;
+        return true;
       }
       if (kind === 'hotel') {
         if (!userExplicitStation && /\b(railway station|train station|bus stand|bus terminal|isbt|airport)\b/i.test(text)) {
@@ -1513,7 +1738,13 @@ async function startServer() {
             ? 'bus stand terminal'
             : kind === 'airport'
             ? 'airport'
-            : kind === 'landmark'
+            : kind === 'temple'
+            ? 'temple mandir shrine'
+            : kind === 'beach'
+            ? 'beach seafront'
+            : kind === 'market'
+            ? 'market bazaar chowk'
+            : isLandmarkKind
             ? 'temple monument palace fort tourist attraction'
             : kind === 'hotel'
             ? 'hotel resort homestay lodge'
@@ -1522,7 +1753,9 @@ async function startServer() {
           station: 'train_station',
           bus: 'bus_station',
           airport: 'airport',
+          temple: 'hindu_temple',
           landmark: 'tourist_attraction',
+          attraction: 'tourist_attraction',
           hotel: 'lodging',
         };
         const textQuery = [query, typeHint, stateFilter, 'India'].filter(Boolean).join(' ');
@@ -1828,6 +2061,7 @@ async function startServer() {
       else if (lbl.startsWith(qLower)) score += 35;
       else if (lbl.includes(qLower)) score += 20;
 
+      if (item.source === 'Regional Landmark Directory') score += 45;
       if (item.source === 'Google Places') score += 22;
       if (item.id.startsWith('wiki-cat-')) score += 20;
       if (rankAnchorLat !== undefined && rankAnchorLng !== undefined) {
@@ -1839,12 +2073,13 @@ async function startServer() {
       return score;
     };
 
-    scopedExternalResults.sort((a, b) => scoreSuggest(b) - scoreSuggest(a));
+    const mergedExternal = [...curatedMatches, ...scopedExternalResults];
+    mergedExternal.sort((a, b) => scoreSuggest(b) - scoreSuggest(a));
 
     // Deduplicate combined results
     const combined: SuggestResult[] = [];
     const seen = new Set<string>();
-    for (const item of [...hubMatches, ...scopedExternalResults]) {
+    for (const item of [...hubMatches, ...mergedExternal]) {
       const norm = item.label.toLowerCase().replace(/\s*\([A-Z0-9-]+\)\s*$/, '').trim();
       const duplicateCoord = combined.some(
         (existing) =>
@@ -1909,7 +2144,7 @@ async function startServer() {
         : { lat, lng };
 
     const resolvedCity = city || resolveKnownCity('', lat, lng);
-    const cacheKey = `v3|${resolvedCity.toLowerCase()}|${state.toLowerCase()}|${lat.toFixed(2)},${lng.toFixed(2)}`;
+    const cacheKey = `v4|${resolvedCity.toLowerCase()}|${state.toLowerCase()}|${lat.toFixed(2)},${lng.toFixed(2)}`;
     const cached = discoverCache.get(cacheKey);
 
     interface RawAttraction {
@@ -2040,23 +2275,42 @@ async function startServer() {
           }
         }
 
-        // Guard against Wikipedia coordinate typos tagging other major metros
-        if (
-          /,\s*(bengaluru|bangalore|kolkata|digha|chennai|mumbai|new delhi|hyderabad)$/i.test(cleanTitle) &&
-          !cityLower.includes(cleanTitle.split(',').pop()!.trim().toLowerCase())
-        ) {
-          return;
+        // Guard against Wikipedia coordinate typos tagging other Indian cities (e.g. "Vaishnodevi Temple, Rourkela")
+        if (item.source === 'Wikipedia & Wikimedia Commons' && cleanTitle.includes(',')) {
+          const trailingPart = cleanTitle.split(',').pop()!.trim().toLowerCase();
+          if (
+            trailingPart &&
+            trailingPart !== 'india' &&
+            !cityLower.includes(trailingPart) &&
+            !trailingPart.includes(cityLower) &&
+            !stateLower.includes(trailingPart)
+          ) {
+            return;
+          }
         }
 
         const distKm = haversineKm(lat, lng, item.lat, item.lng);
         if (distKm > 75) return;
 
         const normKey = cleanTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const nearDuplicate = [...collected.values()].find(
-          (e) =>
-            e.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normKey ||
-            (haversineKm(e.lat, e.lng, item.lat, item.lng) < 0.18 && e.name.split(' ')[0] === cleanTitle.split(' ')[0])
-        );
+        const firstWord = cleanTitle.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim().split(/\s+/)[0] || '';
+        const nearDuplicate = [...collected.values()].find((e) => {
+          const eNorm = e.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (eNorm === normKey) return true;
+          const distBetween = haversineKm(e.lat, e.lng, item.lat, item.lng);
+          if (distBetween > 2.2) return false;
+          if (eNorm.startsWith(normKey) || normKey.startsWith(eNorm)) return true;
+          if (
+            (eNorm.includes('vaishnodevi') && normKey.includes('vaishnodevi')) ||
+            (firstWord.length >= 6 &&
+              e.name.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim().split(/\s+/)[0] === firstWord &&
+              !eNorm.includes('museum') &&
+              !normKey.includes('museum'))
+          ) {
+            return true;
+          }
+          return false;
+        });
         if (!nearDuplicate) {
           collected.set(item.id, item);
         } else {
@@ -2200,6 +2454,30 @@ async function startServer() {
 
       // Track used thumbnail URLs so no two attraction cards ever display duplicate images
       const usedImages = new Set<string>();
+
+      // Inject curated regional highlights within 65 km FIRST so Wikipedia thumbnails attach cleanly without duplicate entries
+      for (const lm of INDIAN_CURATED_LANDMARKS) {
+        const distFromCenter = haversineKm(lat, lng, lm.lat, lm.lng);
+        if (distFromCenter <= 65) {
+          addCandidate(
+            {
+              id: lm.id,
+              name: lm.name,
+              category: lm.discoverCategory,
+              rawType: lm.placeType,
+              location: `${lm.city}, ${lm.state}`,
+              lat: lm.lat,
+              lng: lm.lng,
+              image: null,
+              shortDescription: lm.shortDescription,
+              bestVisitingTime: lm.bestVisitingTime,
+              source: 'Regional Landmark Directory',
+            },
+            true
+          );
+        }
+      }
+
       const allWikiPages = [
         ...catBatches.flatMap((b) => b.pages),
         ...subcatBatches.flatMap((b) => b.pages),
@@ -2895,6 +3173,978 @@ async function startServer() {
         'Distances and durations come from live OSRM road routing. Uber, Ola, and Rapido do not expose public real-time fare or driver-availability APIs in India—fares shown are transparent provider-wise Calculated / Approximate Estimates from regional tariff configs, never official live provider quotes. Confirm live availability inside the provider app before booking.',
       lastUpdated: nowIso,
       quotes,
+    });
+  });
+
+  // =========================================================================
+  // SMART LOCAL HOP API SUITE (/api/smart-hop/*)
+  // =========================================================================
+
+  // 1. Route & Distance Calculator (reuses OSRM primary + optional Google Routes traffic-aware check)
+  app.post('/api/smart-hop/route', async (req: Request, res: Response) => {
+    const { origin, destination } = req.body as {
+      origin?: { label?: string; lat?: number; lng?: number; city?: string; state?: string };
+      destination?: { label?: string; lat?: number; lng?: number; city?: string; state?: string };
+    };
+
+    if (
+      !origin?.label?.trim() ||
+      !destination?.label?.trim() ||
+      !Number.isFinite(origin.lat) ||
+      !Number.isFinite(origin.lng) ||
+      !Number.isFinite(destination.lat) ||
+      !Number.isFinite(destination.lng)
+    ) {
+      res.status(400).json({
+        routeAvailable: false,
+        error: 'Valid origin and destination coordinates are required.',
+      });
+      return;
+    }
+
+    const oLat = Number(origin.lat);
+    const oLng = Number(origin.lng);
+    const dLat = Number(destination.lat);
+    const dLng = Number(destination.lng);
+
+    if (oLat < 5 || oLat > 38.5 || dLat < 5 || dLat > 38.5 || oLng < 66 || oLng > 98.5 || dLng < 66 || dLng > 98.5) {
+      res.status(400).json({
+        routeAvailable: false,
+        error: 'Coordinates appear to be outside India local transit boundaries.',
+      });
+      return;
+    }
+
+    const routeInfo = await computeSmartHopRoute(
+      { lat: oLat, lng: oLng },
+      { lat: dLat, lng: dLng }
+    );
+
+    if (!routeInfo.routeAvailable || routeInfo.distanceKm === null || routeInfo.durationMin === null) {
+      res.status(503).json({
+        routeAvailable: false,
+        error:
+          routeInfo.error ||
+          'Road routing is currently unavailable for these coordinates. Distance and duration are withheld rather than invented.',
+      });
+      return;
+    }
+
+    const resolvedCity =
+      destination.city ||
+      origin.city ||
+      resolveKnownCity(`${destination.label} ${origin.label}`, dLat, dLng);
+    const resolvedState = destination.state || origin.state || '';
+
+    res.json({
+      routeAvailable: true,
+      origin: {
+        label: origin.label.trim(),
+        city: origin.city || resolvedCity,
+        state: origin.state || resolvedState,
+        lat: oLat,
+        lng: oLng,
+      },
+      destination: {
+        label: destination.label.trim(),
+        city: destination.city || resolvedCity,
+        state: destination.state || resolvedState,
+        lat: dLat,
+        lng: dLng,
+      },
+      city: resolvedCity,
+      state: resolvedState,
+      distanceKm: routeInfo.distanceKm,
+      durationMinutes: routeInfo.durationMin,
+      trafficAwareDurationMinutes: routeInfo.trafficAwareDurationMin,
+      isTrafficAware: routeInfo.isTrafficAware,
+      routeSource: routeInfo.source,
+      trafficSourceLabel: routeInfo.trafficSourceLabel,
+      routeGeometry: routeInfo.geometry,
+      routeTimestamp: new Date().toISOString(),
+    });
+  });
+
+  // 2. Fair Fare & Curated Local Tips
+  app.post('/api/smart-hop/fare', async (req: Request, res: Response) => {
+    const {
+      distanceKm,
+      durationMinutes,
+      originLabel = '',
+      destLabel = '',
+      city = '',
+      state = '',
+      origin,
+      destination,
+    } = req.body as {
+      distanceKm?: number | null;
+      durationMinutes?: number | null;
+      originLabel?: string;
+      destLabel?: string;
+      city?: string;
+      state?: string;
+      origin?: { lat: number; lng: number };
+      destination?: { lat: number; lng: number };
+    };
+
+    let effectiveDist: number | null =
+      typeof distanceKm === 'number' && Number.isFinite(distanceKm) ? distanceKm : null;
+    let effectiveDur: number | null =
+      typeof durationMinutes === 'number' && Number.isFinite(durationMinutes) ? durationMinutes : null;
+
+    if ((effectiveDist === null || effectiveDur === null) && origin && destination) {
+      const r = await computeSmartHopRoute(origin, destination);
+      if (r.routeAvailable) {
+        effectiveDist = r.distanceKm;
+        effectiveDur = r.trafficAwareDurationMin ?? r.durationMin;
+      }
+    }
+
+    const { profile, options } = computeSmartLocalHopFares({
+      distanceKm: effectiveDist,
+      durationMin: effectiveDur,
+      cityOrLabel: `${city} ${originLabel} ${destLabel}`,
+      stateName: state,
+    });
+
+    const { tips, matchedLandmark } = findCuratedGroundTips(originLabel, destLabel, city, state);
+
+    res.json({
+      distanceKm: effectiveDist,
+      durationMinutes: effectiveDur,
+      profile,
+      options,
+      curatedTips: tips,
+      matchedLandmarkSummary: matchedLandmark
+        ? {
+            name: matchedLandmark.name,
+            shortDescription: matchedLandmark.shortDescription,
+            bestVisitingTime: matchedLandmark.bestVisitingTime,
+            openingHoursText: matchedLandmark.openingHoursText,
+            openingHoursVerified: matchedLandmark.openingHoursVerified,
+          }
+        : null,
+      disclaimer:
+        'Fare estimates are computed transparently from city/regional tariff formulas and road distance. They are never live operator quotes—always confirm metered or prepaid booth tariffs before boarding.',
+    });
+  });
+
+  // 3. Local Voice Pass Generator (Server-side GROQ_API_KEY + Honest Template Fallback)
+  app.post('/api/smart-hop/local-voice', async (req: Request, res: Response) => {
+    const {
+      originLabel = '',
+      destLabel = '',
+      languageCode = 'hi',
+      languageLabel = 'Hindi',
+      fareMinInr,
+      fareMaxInr,
+      preferredMode = 'auto',
+      pickupNote = '',
+    } = req.body as {
+      originLabel?: string;
+      destLabel?: string;
+      languageCode?: string;
+      languageLabel?: string;
+      fareMinInr?: number | null;
+      fareMaxInr?: number | null;
+      preferredMode?: string;
+      pickupNote?: string;
+    };
+
+    if (!destLabel.trim()) {
+      res.status(400).json({ error: 'Destination name is required to build a Local Voice Pass.' });
+      return;
+    }
+
+    const langTagMap: Record<string, string> = {
+      hi: 'hi-IN',
+      en: 'en-IN',
+      or: 'or-IN',
+      ta: 'ta-IN',
+      mr: 'mr-IN',
+      bn: 'bn-IN',
+      te: 'te-IN',
+      kn: 'kn-IN',
+      ml: 'ml-IN',
+      gu: 'gu-IN',
+      pa: 'pa-IN',
+    };
+    const ttsLangTag = langTagMap[languageCode] || 'en-IN';
+    const hasFareBand =
+      typeof fareMinInr === 'number' &&
+      typeof fareMaxInr === 'number' &&
+      Number.isFinite(fareMinInr) &&
+      Number.isFinite(fareMaxInr);
+    const fareRangeStr = hasFareBand ? `₹${fareMinInr} to ₹${fareMaxInr}` : null;
+    const modeHindi =
+      preferredMode === 'cab' ? 'कैब' : preferredMode === 'bike' ? 'बाइक' : 'ऑटो';
+    const modeEnglish =
+      preferredMode === 'cab' ? 'cab' : preferredMode === 'bike' ? 'bike' : 'auto';
+
+    const buildTemplatePass = (
+      groqStatus: 'not_configured' | 'error',
+      statusMessage: string
+    ): SmartHopLocalVoiceResponse => {
+      const originShort = originLabel.split(',')[0].trim() || 'yahan';
+      const destShort = destLabel.split(',')[0].trim();
+
+      if (languageCode === 'hi') {
+        const farePart = hasFareBand
+          ? ` आम तौर पर ₹${fareMinInr} से ₹${fareMaxInr} के बीच किराया सही रहता है, क्या आप मीटर या सही किराए पर चलेंगे?`
+          : ' कृपया सही और जायज़ किराया बताइए।';
+        const notePart = pickupNote ? ` (${pickupNote})` : '';
+        return {
+          languageCode,
+          languageLabel: 'Hindi',
+          aiPowered: false,
+          aiProvider: null,
+          groqConfigured: Boolean(process.env.GROQ_API_KEY),
+          groqStatus,
+          statusMessage,
+          phraseNative: `नमस्ते भैया, क्या आप हमें ${destShort} तक छोड़ देंगे?${farePart}${notePart}`,
+          transliteration: `Namaste bhaiya, kya aap humein ${destShort} tak chhod denge?${
+            hasFareBand
+              ? ` Aam taur par ₹${fareMinInr} se ₹${fareMaxInr} ke beech kiraya sahi rehta hai, kya aap meter ya sahi kiraye par chalenge?`
+              : ' Kripya sahi aur jayaz kiraya bataiye.'
+          }`,
+          englishTranslation: `Hello, could you please drop us at ${destShort}${
+            originShort ? ` from ${originShort}` : ''
+          }?${
+            fareRangeStr
+              ? ` A fair local ${modeEnglish} fare around here is usually ${fareRangeStr} — would that work cleanly by meter or standard rate?`
+              : ` Please share a fair ${modeEnglish} rate.`
+          }`,
+          toneNote: `Respectful deterministic ${modeHindi} greeting (non-confrontational template)`,
+          ttsLangTag,
+          generatedAt: new Date().toISOString(),
+        };
+      }
+
+      const englishMsg = `Hello, could you please take us to ${destShort}${
+        originShort ? ` from ${originShort}` : ''
+      }?${
+        fareRangeStr
+          ? ` A typical local ${modeEnglish} fare is around ${fareRangeStr} — would you be okay with that or meter rate?`
+          : ` Could you please let us know your fair meter or stand rate before we board?`
+      }`;
+
+      return {
+        languageCode,
+        languageLabel: languageLabel || 'English',
+        aiPowered: false,
+        aiProvider: null,
+        groqConfigured: Boolean(process.env.GROQ_API_KEY),
+        groqStatus,
+        statusMessage,
+        phraseNative: englishMsg,
+        transliteration:
+          languageCode === 'en'
+            ? englishMsg
+            : `Template fallback shown in English because live Groq translation for ${languageLabel} is unavailable.`,
+        englishTranslation: englishMsg,
+        toneNote: 'Polite deterministic phrase template (Groq AI not active)',
+        ttsLangTag: languageCode === 'en' ? 'en-IN' : ttsLangTag,
+        generatedAt: new Date().toISOString(),
+      };
+    };
+
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) {
+      res.json(
+        buildTemplatePass(
+          'not_configured',
+          'Groq AI key (GROQ_API_KEY) is not configured on the server. Showing a polite deterministic phrase template instead.'
+        )
+      );
+      return;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5500);
+      const userPrompt = `Generate a short, polite, respectful conversation pass for an Indian traveller speaking to a local ${modeEnglish} driver.
+Route: From "${originLabel}" to "${destLabel}".
+Target Language: ${languageLabel} (code: ${languageCode}).
+Indicative fair fare range: ${fareRangeStr || 'Not provided (ask politely for meter or official booth rate)'}.
+Extra local note: ${pickupNote || 'None'}.
+Rules:
+1. Keep it under 2 short natural sentences — warm, non-confrontational, respectful.
+2. Never accuse or argue; frame the fare gently as checking the usual fair rate or meter.
+3. Return ONLY valid JSON with exact keys:
+{
+  "phraseNative": "text strictly in the target language script",
+  "transliteration": "easy Roman phonetic pronunciation guide for an English reader (or same as phraseNative if English)",
+  "englishTranslation": "accurate English translation",
+  "toneNote": "3-6 word description of politeness/context"
+}`;
+
+      const gRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${groqKey}`,
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          temperature: 0.3,
+          max_tokens: 320,
+          response_format: { type: 'json_object' },
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are an assistant helping Indian domestic travellers speak politely with local auto/cab drivers in regional Indian languages. Output strictly valid JSON.',
+            },
+            { role: 'user', content: userPrompt },
+          ],
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      if (!gRes.ok) {
+        res.json(
+          buildTemplatePass(
+            'error',
+            `Groq AI returned status ${gRes.status}. Falling back cleanly to the structured phrase template.`
+          )
+        );
+        return;
+      }
+
+      const gJson = (await gRes.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const rawContent = gJson.choices?.[0]?.message?.content || '';
+      const parsed = JSON.parse(rawContent) as {
+        phraseNative?: string;
+        transliteration?: string;
+        englishTranslation?: string;
+        toneNote?: string;
+      };
+
+      if (!parsed.phraseNative || !parsed.englishTranslation) {
+        res.json(
+          buildTemplatePass(
+            'error',
+            'Groq AI returned an incomplete phrase payload. Showing structured phrase template instead.'
+          )
+        );
+        return;
+      }
+
+      const payload: SmartHopLocalVoiceResponse = {
+        languageCode,
+        languageLabel,
+        aiPowered: true,
+        aiProvider: 'Groq AI (llama-3.1-8b-instant)',
+        groqConfigured: true,
+        groqStatus: 'ok',
+        statusMessage: `Generated live via Groq AI in ${languageLabel}.`,
+        phraseNative: parsed.phraseNative.trim(),
+        transliteration: (parsed.transliteration || parsed.phraseNative).trim(),
+        englishTranslation: parsed.englishTranslation.trim(),
+        toneNote: (parsed.toneNote || 'Polite respectful local conversation').trim(),
+        ttsLangTag,
+        generatedAt: new Date().toISOString(),
+      };
+      res.json(payload);
+    } catch {
+      res.json(
+        buildTemplatePass(
+          'error',
+          'Groq AI request timed out or could not be reached. Showing deterministic phrase template instead.'
+        )
+      );
+    }
+  });
+
+  // 4. Timing & Crowd Clock Endpoint
+  app.post('/api/smart-hop/timing', async (req: Request, res: Response) => {
+    const {
+      durationMinutes,
+      trafficAwareDurationMinutes,
+      origin,
+      destination,
+      destLabel = '',
+      city = '',
+      state = '',
+      presetType = 'Sightseeing',
+      walkingBufferMin = 10,
+      parkingBufferMin = 5,
+      activityBufferMin = 60,
+      customDeadlineTime = '', // "HH:MM" 24h in IST/local
+      returnDepartureTime = '', // "HH:MM" 24h in IST/local (user entered)
+      returnCheckInBufferMin = 25,
+    } = req.body as {
+      durationMinutes?: number;
+      trafficAwareDurationMinutes?: number | null;
+      origin?: { lat: number; lng: number };
+      destination?: { lat: number; lng: number };
+      destLabel?: string;
+      city?: string;
+      state?: string;
+      presetType?: string;
+      walkingBufferMin?: number;
+      parkingBufferMin?: number;
+      activityBufferMin?: number;
+      customDeadlineTime?: string;
+      returnDepartureTime?: string;
+      returnCheckInBufferMin?: number;
+    };
+
+    let activeTravelMin =
+      typeof trafficAwareDurationMinutes === 'number' && Number.isFinite(trafficAwareDurationMinutes)
+        ? trafficAwareDurationMinutes
+        : typeof durationMinutes === 'number' && Number.isFinite(durationMinutes)
+        ? durationMinutes
+        : null;
+    let isTrafficAware =
+      typeof trafficAwareDurationMinutes === 'number' && Number.isFinite(trafficAwareDurationMinutes);
+
+    if (activeTravelMin === null && origin && destination) {
+      const r = await computeSmartHopRoute(origin, destination);
+      if (r.routeAvailable && r.durationMin !== null) {
+        activeTravelMin = r.trafficAwareDurationMin ?? r.durationMin;
+        isTrafficAware = r.isTrafficAware;
+      }
+    }
+
+    if (activeTravelMin === null) {
+      res.status(400).json({ error: 'Valid travel duration or route coordinates are required.' });
+      return;
+    }
+
+    const walkMin = Math.max(0, Math.min(180, Number(walkingBufferMin) || 0));
+    const parkMin = Math.max(0, Math.min(90, Number(parkingBufferMin) || 0));
+    const actMin = Math.max(0, Math.min(480, Number(activityBufferMin) || 0));
+
+    const now = new Date();
+    const travelAndAccessMin = activeTravelMin + walkMin + parkMin;
+    const totalNeededMin = travelAndAccessMin + actMin;
+    const venueArrivalDate = new Date(now.getTime() + travelAndAccessMin * 60000);
+    const completionDate = new Date(now.getTime() + totalNeededMin * 60000);
+
+    const { matchedLandmark } = findCuratedGroundTips('', destLabel, city, state);
+    let openingText = matchedLandmark?.openingHoursText || 'Opening/closing hours unavailable — verify locally';
+    let openingVerified = Boolean(matchedLandmark?.openingHoursVerified);
+    let openingSource = matchedLandmark ? 'Yatra Saathi Landmark Notes' : 'Hours Unverified';
+    let openNowEstimate: boolean | null = null;
+    let derivedClosingHour24: number | null = matchedLandmark?.typicalCloseHour24 ?? null;
+
+    // Optional live Google Places hours check if key configured
+    const gmpKey = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (gmpKey && destLabel.trim()) {
+      const pKey = `${destLabel.toLowerCase()}|${city.toLowerCase()}`;
+      const cachedHours = placeHoursCache.get(pKey);
+      if (cachedHours && cachedHours.expiresAt > Date.now()) {
+        openingText = cachedHours.text;
+        openingVerified = true;
+        openingSource = 'Google Places Regular Hours';
+        openNowEstimate = cachedHours.openNow;
+      } else {
+        try {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 2800);
+          const body: Record<string, unknown> = {
+            textQuery: [destLabel, city, state, 'India'].filter(Boolean).join(' '),
+            regionCode: 'IN',
+            maxResultCount: 1,
+          };
+          if (destination && Number.isFinite(destination.lat) && Number.isFinite(destination.lng)) {
+            body.locationBias = {
+              circle: { center: { latitude: destination.lat, longitude: destination.lng }, radius: 5000 },
+            };
+          }
+          const gRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Goog-Api-Key': gmpKey,
+              'X-Goog-FieldMask':
+                'places.regularOpeningHours.weekdayDescriptions,places.currentOpeningHours.openNow',
+            },
+            body: JSON.stringify(body),
+            signal: ctrl.signal,
+          });
+          clearTimeout(t);
+          if (gRes.ok) {
+            const gJson = (await gRes.json()) as {
+              places?: Array<{
+                regularOpeningHours?: { weekdayDescriptions?: string[] };
+                currentOpeningHours?: { openNow?: boolean };
+              }>;
+            };
+            const firstPlace = gJson.places?.[0];
+            const desc = firstPlace?.regularOpeningHours?.weekdayDescriptions?.[0];
+            if (desc) {
+              openingText = desc;
+              openingVerified = true;
+              openingSource = 'Google Places Regular Hours';
+              openNowEstimate =
+                typeof firstPlace?.currentOpeningHours?.openNow === 'boolean'
+                  ? firstPlace.currentOpeningHours.openNow
+                  : null;
+              placeHoursCache.set(pKey, {
+                expiresAt: Date.now() + 15 * 60 * 1000,
+                text: desc,
+                openNow: openNowEstimate,
+              });
+            }
+          }
+        } catch {
+          // Silently retain curated/unverified status
+        }
+      }
+    }
+
+    // Helper: parse HH:MM onto today (or tomorrow if already passed by >3h)
+    const parseClockTime = (hhmm: string): Date | null => {
+      const m = /^(\d{1,2}):(\d{2})$/.exec((hhmm || '').trim());
+      if (!m) return null;
+      const hh = Number(m[1]);
+      const mm = Number(m[2]);
+      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+      const d = new Date(now);
+      d.setHours(hh, mm, 0, 0);
+      if (d.getTime() < now.getTime() - 3 * 3600 * 1000) {
+        d.setDate(d.getDate() + 1);
+      }
+      return d;
+    };
+
+    let deadlineDate: Date | null = null;
+    let deadlineLabel: string | null = null;
+
+    if (customDeadlineTime.trim()) {
+      deadlineDate = parseClockTime(customDeadlineTime);
+      deadlineLabel = `Your Deadline (${customDeadlineTime})`;
+    } else if (presetType === 'Beach / Sunset') {
+      const sunsetGuess = new Date(now);
+      sunsetGuess.setHours(18, 0, 0, 0);
+      if (sunsetGuess.getTime() < now.getTime() - 2 * 3600 * 1000) {
+        sunsetGuess.setDate(sunsetGuess.getDate() + 1);
+      }
+      deadlineDate = sunsetGuess;
+      deadlineLabel = 'Approximate Evening Sunset (~6:00 PM — seasonal estimate)';
+    } else if (derivedClosingHour24 !== null && derivedClosingHour24 < 24) {
+      const hh = Math.floor(derivedClosingHour24);
+      const mm = Math.round((derivedClosingHour24 - hh) * 60);
+      const closeD = new Date(now);
+      closeD.setHours(hh, mm, 0, 0);
+      if (closeD.getTime() < now.getTime() - 2 * 3600 * 1000) {
+        closeD.setDate(closeD.getDate() + 1);
+      }
+      deadlineDate = closeD;
+      deadlineLabel = `Indicative Closing Window (~${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')})`;
+    }
+
+    let safeMarginMin: number | null = null;
+    let status: TimingStatus = 'INFO_ONLY';
+    let statusHeadline = 'Timing calculated — enter a closing cutoff or train deadline to check margin.';
+
+    if (deadlineDate) {
+      safeMarginMin = Math.round((deadlineDate.getTime() - completionDate.getTime()) / 60000);
+      if (safeMarginMin >= 25) {
+        status = 'SAFE';
+        statusHeadline = `Safe Margin — you finish with ~${safeMarginMin} min spare before ${deadlineLabel}.`;
+      } else if (safeMarginMin >= 0) {
+        status = 'HURRY';
+        statusHeadline = `Hurry — only ${safeMarginMin} min buffer before ${deadlineLabel}. Traffic or queues could tighten this.`;
+      } else {
+        status = 'RISK';
+        statusHeadline = `Tight / Risk — projected to overshoot ${deadlineLabel} by ${Math.abs(safeMarginMin)} min. Trim stay time or leave earlier.`;
+      }
+    }
+
+    // Return Train / Bus Planner (explicitly user-entered)
+    const retDep = returnDepartureTime.trim() ? parseClockTime(returnDepartureTime) : null;
+    const retCheckIn = Math.max(5, Math.min(120, Number(returnCheckInBufferMin) || 25));
+    let mustLeaveByIso: string | null = null;
+    let returnMarginMin: number | null = null;
+    let returnStatus: TimingStatus | null = null;
+    if (retDep) {
+      const returnNeededMs = (activeTravelMin + retCheckIn) * 60000;
+      const mustLeaveDate = new Date(retDep.getTime() - returnNeededMs);
+      mustLeaveByIso = mustLeaveDate.toISOString();
+      returnMarginMin = Math.round((mustLeaveDate.getTime() - completionDate.getTime()) / 60000);
+      if (returnMarginMin >= 25) returnStatus = 'SAFE';
+      else if (returnMarginMin >= 0) returnStatus = 'HURRY';
+      else returnStatus = 'RISK';
+    }
+
+    const responsePayload: SmartHopTimingResponse = {
+      status,
+      statusHeadline,
+      nowIso: now.toISOString(),
+      travelDurationMin: activeTravelMin,
+      isTrafficAware,
+      walkingBufferMin: walkMin,
+      parkingBufferMin: parkMin,
+      activityBufferMin: actMin,
+      totalTimeNeededMin: totalNeededMin,
+      estimatedVenueArrivalIso: venueArrivalDate.toISOString(),
+      estimatedCompletionIso: completionDate.toISOString(),
+      safeMarginMin,
+      deadlineUsedLabel: deadlineLabel,
+      deadlineIso: deadlineDate ? deadlineDate.toISOString() : null,
+      openingHoursInfo: {
+        text: openingText,
+        verified: openingVerified,
+        source: openingSource,
+        isOpenEstimate: openNowEstimate,
+      },
+      returnPlanner: {
+        hasReturnDeparture: Boolean(retDep),
+        returnDepartureIso: retDep ? retDep.toISOString() : null,
+        isUserEntered: true,
+        verificationNotice:
+          'Return departure times are user-entered and not auto-fetched from IRCTC or bus operators.',
+        returnTravelMin: activeTravelMin,
+        recommendedCheckInBufferMin: retCheckIn,
+        mustLeaveByIso,
+        returnMarginMin,
+        returnStatus,
+      },
+      crowd: {
+        status: 'Information Unavailable',
+        available: false,
+        message: 'Crowd information is currently unavailable.',
+        note: 'Yatra Saathi does not show simulated or fabricated live crowd densities.',
+      },
+    };
+
+    res.json(responsePayload);
+  });
+
+  // 5. Zero-Detour En-route Pitstops (Route corridor + Google Places + real detour check)
+  app.post('/api/smart-hop/pitstops', async (req: Request, res: Response) => {
+    const {
+      routeGeometry = [],
+      origin,
+      destination,
+      originalDistanceKm,
+      originalDurationMin,
+      category = 'pure_veg',
+    } = req.body as {
+      routeGeometry?: Array<{ lat: number; lng: number }>;
+      origin?: { lat: number; lng: number; label?: string };
+      destination?: { lat: number; lng: number; label?: string };
+      originalDistanceKm?: number;
+      originalDurationMin?: number;
+      category?: PitstopCategory;
+    };
+
+    if (
+      !origin ||
+      !destination ||
+      !Number.isFinite(origin.lat) ||
+      !Number.isFinite(origin.lng) ||
+      !Number.isFinite(destination.lat) ||
+      !Number.isFinite(destination.lng)
+    ) {
+      res.status(400).json({ error: 'Valid journey origin and destination are required.' });
+      return;
+    }
+
+    const baseDist = Number.isFinite(Number(originalDistanceKm)) ? Number(originalDistanceKm) : 0;
+    const baseDur = Number.isFinite(Number(originalDurationMin)) ? Number(originalDurationMin) : 0;
+
+    const gmpKey = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!gmpKey) {
+      res.json({
+        category,
+        placesAvailable: false,
+        quotaExceeded: false,
+        status: 'unavailable',
+        message:
+          'Google Places API integration is not configured on this server. En-route pitstop search is unavailable.',
+        originalDistanceKm: baseDist,
+        originalDurationMin: baseDur,
+        stops: [],
+      });
+      return;
+    }
+
+    const geom =
+      Array.isArray(routeGeometry) && routeGeometry.length >= 2
+        ? routeGeometry
+        : [
+            { lat: origin.lat, lng: origin.lng },
+            { lat: (origin.lat + destination.lat) / 2, lng: (origin.lng + destination.lng) / 2 },
+            { lat: destination.lat, lng: destination.lng },
+          ];
+
+    // Pick 2-3 evenly spaced sample points strictly inside the corridor
+    const sampleIndices =
+      geom.length <= 3
+        ? [Math.floor(geom.length / 2)]
+        : baseDist <= 5
+        ? [Math.floor(geom.length * 0.35), Math.floor(geom.length * 0.7)]
+        : [Math.floor(geom.length * 0.2), Math.floor(geom.length * 0.5), Math.floor(geom.length * 0.8)];
+
+    const samplePoints = sampleIndices.map((idx) => geom[Math.min(geom.length - 1, Math.max(0, idx))]);
+
+    const categoryMeta: Record<
+      PitstopCategory,
+      { textQuery: string; includedType?: string; strictKeywordRegex?: RegExp; emptyMsg: string }
+    > = {
+      washroom: {
+        textQuery: 'public toilet restroom washroom sulabh',
+        strictKeywordRegex: /\b(toilet|washroom|restroom|sulabh|sanitation|lavatory|wc)\b/i,
+        emptyMsg:
+          'No reliable public washroom listings were returned by Places along this route corridor.',
+      },
+      pure_veg: {
+        textQuery: 'pure vegetarian restaurant bhojanalaya',
+        includedType: 'restaurant',
+        emptyMsg:
+          'No pure vegetarian dining listings matched strictly along this route corridor.',
+      },
+      local_food: {
+        textQuery: 'local food tiffin eatery dhaba restaurant',
+        includedType: 'restaurant',
+        emptyMsg: 'No local food stops returned by Places along this route corridor.',
+      },
+      atm: {
+        textQuery: 'ATM cash bank',
+        includedType: 'atm',
+        emptyMsg: 'No ATMs returned by Places along this route corridor.',
+      },
+      pharmacy: {
+        textQuery: 'pharmacy medical store chemist',
+        includedType: 'pharmacy',
+        emptyMsg: 'No pharmacies or medical stores returned by Places along this route corridor.',
+      },
+      cloakroom: {
+        textQuery: 'luggage storage cloakroom locker baggage',
+        strictKeywordRegex: /\b(cloakroom|luggage|baggage|locker|left luggage|storage|waiting hall)\b/i,
+        emptyMsg:
+          'No verified luggage cloakrooms were returned by Places along this corridor. Railway stations and major shrine gates often run on-site cloakrooms.',
+      },
+    };
+
+    const meta = categoryMeta[category] || categoryMeta.pure_veg;
+    const rawPlaces: Array<{
+      id: string;
+      name: string;
+      address: string;
+      lat: number;
+      lng: number;
+      rating: number | null;
+      userRatingCount: number | null;
+      openNow: boolean | null;
+      photoName: string | null;
+      googleMapsUri: string | null;
+    }> = [];
+
+    let quotaHit = false;
+    let upstreamErrorStatus: number | null = null;
+    let hadSuccessfulPlacesResponse = false;
+    const searchRadiusMeters = baseDist <= 4 ? 900 : 1600;
+
+    await Promise.all(
+      samplePoints.map(async (pt) => {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 3500);
+          const body: Record<string, unknown> = {
+            textQuery: meta.textQuery,
+            regionCode: 'IN',
+            languageCode: 'en',
+            maxResultCount: 6,
+            locationBias: {
+              circle: {
+                center: { latitude: pt.lat, longitude: pt.lng },
+                radius: searchRadiusMeters,
+              },
+            },
+          };
+          if (meta.includedType) {
+            body.includedType = meta.includedType;
+          }
+          const pRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Goog-Api-Key': gmpKey,
+              'X-Goog-FieldMask':
+                'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.rating,places.userRatingCount,places.currentOpeningHours.openNow,places.photos,places.googleMapsUri',
+            },
+            body: JSON.stringify(body),
+            signal: ctrl.signal,
+          });
+          clearTimeout(timer);
+
+          if (pRes.status === 429) {
+            quotaHit = true;
+            return;
+          }
+          if (!pRes.ok) {
+            upstreamErrorStatus = pRes.status;
+            return;
+          }
+          hadSuccessfulPlacesResponse = true;
+
+          const pJson = (await pRes.json()) as {
+            places?: Array<{
+              id: string;
+              displayName?: { text?: string };
+              formattedAddress?: string;
+              location?: { latitude?: number; longitude?: number };
+              types?: string[];
+              rating?: number;
+              userRatingCount?: number;
+              currentOpeningHours?: { openNow?: boolean };
+              photos?: Array<{ name?: string }>;
+              googleMapsUri?: string;
+            }>;
+          };
+
+          for (const p of pJson.places || []) {
+            if (!p.id || !p.displayName?.text || !p.location?.latitude || !p.location?.longitude) continue;
+            const hay = `${p.displayName.text} ${p.formattedAddress || ''} ${(p.types || []).join(' ')}`;
+            if (meta.strictKeywordRegex && !meta.strictKeywordRegex.test(hay)) {
+              continue;
+            }
+            rawPlaces.push({
+              id: p.id,
+              name: p.displayName.text,
+              address: p.formattedAddress || 'Address on route',
+              lat: p.location.latitude,
+              lng: p.location.longitude,
+              rating: typeof p.rating === 'number' ? p.rating : null,
+              userRatingCount: typeof p.userRatingCount === 'number' ? p.userRatingCount : null,
+              openNow:
+                typeof p.currentOpeningHours?.openNow === 'boolean'
+                  ? p.currentOpeningHours.openNow
+                  : null,
+              photoName: p.photos?.[0]?.name || null,
+              googleMapsUri: p.googleMapsUri || null,
+            });
+          }
+        } catch {
+          // Ignore single-point timeout
+        }
+      })
+    );
+
+    if (quotaHit && rawPlaces.length === 0) {
+      res.json({
+        category,
+        placesAvailable: false,
+        quotaExceeded: true,
+        status: 'quota_exceeded',
+        message: 'Google Places API quota reached. Try again later.',
+        originalDistanceKm: baseDist,
+        originalDurationMin: baseDur,
+        stops: [],
+      });
+      return;
+    }
+
+    if (!hadSuccessfulPlacesResponse && rawPlaces.length === 0) {
+      res.json({
+        category,
+        placesAvailable: false,
+        quotaExceeded: false,
+        status: 'unavailable',
+        message: upstreamErrorStatus
+          ? `Google Places API (New) server request returned HTTP ${upstreamErrorStatus}. Ensure the server Places API key permits backend Places (New) requests without referrer block.`
+          : 'Google Places API (New) could not be reached from the server right now. En-route pitstop discovery is unavailable.',
+        originalDistanceKm: baseDist,
+        originalDurationMin: baseDur,
+        stops: [],
+      });
+      return;
+    }
+
+    // Deduplicate & keep strictly close to the route corridor
+    const maxCorridorOffsetKm = baseDist <= 5 ? 0.9 : 1.8;
+    const deduped: Array<(typeof rawPlaces)[number] & { corridorOffsetKm: number; progressPercent: number }> = [];
+    for (const p of rawPlaces) {
+      if (deduped.some((d) => d.id === p.id || haversineKm(d.lat, d.lng, p.lat, p.lng) < 0.08)) continue;
+      const proj = projectPointOntoPolyline({ lat: p.lat, lng: p.lng }, geom);
+      if (proj.minDistanceKm > maxCorridorOffsetKm) continue;
+      deduped.push({
+        ...p,
+        corridorOffsetKm: proj.minDistanceKm,
+        progressPercent: proj.progressPercent,
+      });
+    }
+
+    // Rank best corridor candidates & limit detour routing calls to top 6 stops
+    deduped.sort((a, b) => a.corridorOffsetKm - b.corridorOffsetKm);
+    const shortlisted = deduped.slice(0, 6);
+
+    // Order monotonically along the journey progress
+    shortlisted.sort((a, b) => a.progressPercent - b.progressPercent);
+
+    const stops: EnroutePitstop[] = await Promise.all(
+      shortlisted.map(async (p) => {
+        const via = await computeViaStopRoadRoute(
+          { lat: origin.lat, lng: origin.lng },
+          { lat: p.lat, lng: p.lng },
+          { lat: destination.lat, lng: destination.lng }
+        );
+        const addDist = via ? Math.max(0, Number((via.distanceKm - baseDist).toFixed(2))) : null;
+        const addMin = via ? Math.max(0, Math.round(via.durationMin - baseDur)) : null;
+        const isZeroDetour = Boolean(via && addDist !== null && addMin !== null && addDist <= 0.15 && addMin <= 1);
+        const detourLabel = !via
+          ? 'Detour unverified'
+          : isZeroDetour
+          ? 'Zero Detour'
+          : `+${addDist!.toFixed(1)} km · +${addMin} min detour`;
+
+        return {
+          id: p.id,
+          name: p.name,
+          category,
+          address: p.address,
+          lat: p.lat,
+          lng: p.lng,
+          routeProgressPercent: p.progressPercent,
+          corridorOffsetKm: p.corridorOffsetKm,
+          additionalDistanceKm: addDist,
+          additionalMinutes: addMin,
+          isZeroDetour,
+          detourLabel,
+          detourVerified: Boolean(via),
+          rating: p.rating,
+          userRatingCount: p.userRatingCount,
+          openNow: p.openNow,
+          photoUrl: p.photoName ? `/api/places/photo?name=${encodeURIComponent(p.photoName)}` : null,
+          directionsUrl:
+            p.googleMapsUri ||
+            `https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${p.lat},${p.lng}&travelmode=driving`,
+          sourceNote: 'Google Places API (New) · Detour via road routing',
+        };
+      })
+    );
+
+    if (stops.length === 0) {
+      res.json({
+        category,
+        placesAvailable: true,
+        quotaExceeded: false,
+        status: 'empty',
+        message: meta.emptyMsg,
+        originalDistanceKm: baseDist,
+        originalDurationMin: baseDur,
+        stops: [],
+      });
+      return;
+    }
+
+    res.json({
+      category,
+      placesAvailable: true,
+      quotaExceeded: false,
+      status: 'ok',
+      message: `${stops.length} en-route stop${stops.length === 1 ? '' : 's'} sorted along your route corridor.`,
+      originalDistanceKm: baseDist,
+      originalDurationMin: baseDur,
+      stops,
     });
   });
 
